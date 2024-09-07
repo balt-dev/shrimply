@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <string>
+#include <utility>
 
 namespace lexer { class Token; }
 
@@ -15,10 +16,10 @@ namespace exceptions {
 
     class SyntaxError: std::exception {
     public:
+        std::string message;
         const FilePosition position;
 
-        std::string message;
-        SyntaxError(std::string, FilePosition);
+        SyntaxError(std::string msg, const FilePosition pos) : message(std::move(msg)), position(pos) {}
 
         static SyntaxError unexpectedEOF(const FilePosition position) {
             return SyntaxError("unexpected end of file", position);
@@ -34,7 +35,7 @@ namespace exceptions {
     class InvalidAST final: std::exception {
     public:
         const FilePosition position;
-        InvalidAST(FilePosition);
+        explicit InvalidAST(const FilePosition pos) : position(pos) {}
 
         const char * what() const noexcept override {
             return ("encountered invalid AST at " + position.to_string() + " (this is probably a parser bug)").c_str();
@@ -44,7 +45,7 @@ namespace exceptions {
     class RuntimeError final: std::exception {
     public:
         std::string message;
-        explicit RuntimeError(std::string);
+        explicit RuntimeError(std::string msg) : message(std::move(msg)) {}
 
         const char * what() const noexcept override { return ("runtime error: " + message).c_str(); }
     };

@@ -45,34 +45,41 @@ void Parser::advance(lexer::Token token) {
     if (type == TokenType::COMMENT) return; // Ignore comments
 
     switch (stateStack.back()) {
-        case ParserState::ROOT:
+        // Note: I've used blocks around the cases to make them distinct variable scopes.
+        case ParserState::ROOT: {
             switch (type.inner()) {
                 PUSH_IF_MATCH(KW_LET, DECLARATION_IDENT, Declaration);
                 PUSH_IF_MATCH(KW_FUNCTION, FUNCTION_IDENT, Function);
                 default: THROW_UNEXPECTED;
             } break;
-        case ParserState::FUNCTION_IDENT:
+        }
+        case ParserState::FUNCTION_IDENT: {
             EXPECT_SWAP_BREAK(IDENTIFIER, FUNCTION_OPEN_PAREN);
-        case ParserState::FUNCTION_OPEN_PAREN:
+        }
+        case ParserState::FUNCTION_OPEN_PAREN: {
             EXPECT_TYPE(PUNC_L_PAREN);
             PUSH_ITEM(ArgList);
             SWAP_AND_BREAK(ARGLIST_NEXT);
-        case ParserState::ARGLIST_NEXT:
+        }
+        case ParserState::ARGLIST_NEXT: {
             switch (type.inner()) {
-                case TokenType::IDENTIFIER:
+                case TokenType::IDENTIFIER: {
                     TRY_DOWNCAST(argList, ArgList, head);
                     argList->arguments.push_back(token.to_string());
                     SWAP_AND_BREAK(ARGLIST_COMMA);
-                case TokenType::PUNC_R_PAREN:
+                }
+                case TokenType::PUNC_R_PAREN: {
                     TRY_DOWNCAST(completeArgList, ArgList, head);
                     const auto args = completeArgList->arguments;
                     POP_ITEM(Function, fnHead);
                     fnHead->arguments = args;
                     PUSH_AND_BREAK(BLOCK, Block);
+                }
                 default: THROW_UNEXPECTED
             }
-        case ParserState::ARGLIST_COMMA:
+        }
+        case ParserState::ARGLIST_COMMA: {
             EXPECT_SWAP_BREAK(PUNC_COMMA, ARGLIST_NEXT);
-
+        }
     }
 }
