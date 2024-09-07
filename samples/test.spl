@@ -1,0 +1,26 @@
+/*
+    .spl is pronounced spill, standing for "simple programming language"
+
+    - Functions are not first class, can't pass them around
+    - Variable types are null, boolean, number (double), string, list, and map
+        - Strings are a const std::string
+        - Lists are a std::shared_ptr<std::vector<Value>>
+        - Maps are a std::shared_ptr<std::map<Value, Value>>
+    - Two types of functions, sharing a base class AbstractFn
+            - Builtin functions, BuiltinFn
+            - User-defined functions, UserFn
+        - Value AbstractFn::call(std::vector<Value>)
+
+    number: 0.4
+    boolean: true
+    string: "Here we go!"
+    list: [1, "any", null, true]
+    map: { 1: 2, "any": 5 }
+
+*/
+
+fn main() {
+    let x = 5;
+    let y = 3;
+    print(x + y); /* should print 8 */
+}
