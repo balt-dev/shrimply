@@ -6,24 +6,28 @@ SRCDIR=./src
 INCLUDEDIR=./include
 OBJDIR=./obj
 OUTDIR=./lib
+EXECUTABLE=$(OUTDIR)/$(TARGET)
 
-SOURCES=$(wildcard $(SRCDIR)/*.cpp)
-OBJECTS=$(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
-HEADERS=$(wildcard $(INCLUDEDIR)/*.h)
+SRCS=$(wildcard $(SRCDIR)/*.cpp)
+OBJECTS=$(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SRCS))
+HEADS=$(wildcard $(INCLUDEDIR)/*.h)
 
-LDFLAGS=-I$(INCLUDEDIR)
-CPPFLAGS=-g -Wall
+LDFLAGS=
+CPPFLAGS=-g -Wall -I$(INCLUDEDIR)
 
-$(OUTDIR)/$(TARGET): $(OBJECTS)
+$(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	$(CC) $(CPPFLAGS) -c -o $@ $^
 
-all: $(SOURCES) $(OBJECTS) $(HEADERS)
+all: $(SRCS) $(OBJECTS) $(HEADS)
 	make $(OBJECTS)
-	make $(OUTDIR)/$(TARGET)
+	make $(EXECUTABLE)
 
 clean:
-	rm -r $(OBJDIR)/*
-	rm -r $(OUTDIR)/*
+	rm -rf $(OBJDIR)/*
+	rm -rf $(OUTDIR)/*
+
+test:
+	$(EXECUTABLE) ./samples/test.spl
