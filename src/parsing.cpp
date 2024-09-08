@@ -99,7 +99,23 @@ void Parser::advance(lexer::Token token) {
             break;
         }
         case ParserState::ARGLIST_COMMA: {
-            EXPECT_SWAP_BREAK(PUNC_COMMA, ARGLIST_NEXT);
+            switch (type.inner()) {
+                case TokenType::PUNC_COMMA: {
+                    SWAP_AND_BREAK(ARGLIST_NEXT);
+                }
+                case TokenType::PUNC_R_PAREN: {
+                    TRY_DOWNCAST(argList, ArgList, head);
+                    treeCursor.pop_back();
+                    TRY_DOWNCAST(fn, Function, treeCursor.back());
+                    fn->arguments = argList->arguments;
+                    stateStack.back() = ParserState::FUNCTION_BLOCK;
+                    stateStack.push_back(ParserState::BLOCK_START);
+                    treeCursor.push_back(std::make_shared<Block>());
+                    break;
+                }
+                default: THROW_UNEXPECTED
+            }
+            break;
         }
         case ParserState::BLOCK_START: {
             EXPECT_SWAP_BREAK(PUNC_L_BRACE, BLOCK);
