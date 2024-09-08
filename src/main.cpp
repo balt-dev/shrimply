@@ -1,20 +1,8 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
 
 #include "lexer.h"
-
-#define TESTING
-
-std::vector<lexer::Token> tokenize(std::string file) {
-    std::vector<lexer::Token> tokens;
-    lexer::Lexer lexer ( file );
-    lexer::Token token;
-    // Trust me, a goto was better here.
-    while (lexer.advanceToken(token))
-        tokens.push_back(token);
-    return tokens;
-}
+#include "parsing.h"
 
 int main( int argc, char * argv[]) {
     if (argc <= 1) {
@@ -42,24 +30,21 @@ int main( int argc, char * argv[]) {
         }
     }
 
-    // Tokenize
-    std::vector<lexer::Token> tokens;
+    // Tokenize and parse the AST
+    lexer::Lexer lexer ( fileContents );
+    parsing::Parser parser;
+    parsing::Root syntaxTree;
     try {
-        tokens = tokenize(fileContents);
-    } catch (exceptions::SyntaxError& err) {
+        lexer::Token token;
+        while (lexer.advanceToken(token)) {
+            // Feed it to the parser
+            parser.advance(token);
+        }
+        syntaxTree = parser.getSyntaxTree();
+    } catch (const std::exception & err) {
         std::cerr << err.what() << std::endl;
         return 1;
     }
-
-#ifdef TESTING
-    std::cerr << "Tokens: ";
-    for (auto token : tokens) {
-        std::cerr << token.to_string() << " ";
-    }
-    std::cerr << std::endl;
-#endif
-
-    // Now that we have the tokens, convert them to an AST
 
     return 0;
 }

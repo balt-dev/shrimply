@@ -1,8 +1,6 @@
 #pragma once
 #include <memory>
-#include <stdexcept>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "value.h"
@@ -11,25 +9,27 @@
 namespace parsing {
     /// The parser's current state.
     enum struct ParserState {
-        ROOT, DECLARATION_IDENT, FUNCTION_IDENT, FUNCTION_OPEN_PAREN, ARGLIST_ROOT, ARGLIST_NEXT, BLOCK, ARGLIST_COMMA
+        ROOT, DECLARATION_IDENT, FUNCTION_IDENT, FUNCTION_OPEN_PAREN, ARGLIST_ROOT, ARGLIST_NEXT, BLOCK, ARGLIST_COMMA,
+        STATEMENT, FUNCTION_BLOCK, BLOCK_START
     };
 
     class Atom {
         // HACK: force this to be polymorphic
-        virtual void hack() {}
+        virtual void __HACK() {}
     };
     /// A top-level item in the file, like a global variable or a function.
-    class Item {
+    class Item: public Atom {
     public:
         virtual ~Item() = default;
     };
     // The entire file.
     class Root final: public Atom {
+    public:
         std::vector<std::shared_ptr<Item>> items;
     };
     /// A statement, like a variable declaration or return.
-    class Statement {};
-    class Expression {
+    class Statement: public Atom {};
+    class Expression: public Atom {
         /// Assigns a value to the place this expression represents.
         virtual void assign(value::AbstractValue value) {
             throw exceptions::RuntimeError("expression is not an lvalue");
@@ -102,11 +102,18 @@ namespace parsing {
     };
 
     class Parser {
+        lexer::Token lastToken;
         std::vector<ParserState> stateStack { ParserState::ROOT };
-        std::vector<std::shared_ptr<Atom>> syntaxTree { std::make_shared<Root>() };
-        std::shared_ptr<Atom> treeHead { syntaxTree.back() };
+        std::shared_ptr<Root> syntaxTree;
+        std::vector<std::shared_ptr<Atom>> treeCursor;
 
     public:
+        Parser() {
+            const auto root = std::make_shared<Root>();
+            syntaxTree = root;
+            treeCursor.push_back(root);
+        }
+
         /// @brief Advances the parser by one token.
         /// @param token The next token in the file.
         void advance(lexer::Token token);

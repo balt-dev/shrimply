@@ -145,7 +145,7 @@ namespace lexer {
 
         /// @brief Advances the lexer by one token.
         /// @param token Out parameter to store the parsed token in.
-        /// @return Boolean dictating whether the end of the file has been reached.
+        /// @return Boolean dictating whether the end of the file has not been reached.
         /// @throw exceptions::SyntaxError
         bool advanceToken(Token & token);
     };
