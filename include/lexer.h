@@ -3,6 +3,10 @@
 
 #include "exceptions.h"
 
+namespace parsing {
+    class Parser;
+}
+
 /// Contains the lexer for parsing programs.
 /// This simply turns a string into a list of tokens.
 namespace lexer {
@@ -10,13 +14,13 @@ namespace lexer {
 
     // A type that a token can be.
     class TokenType {
+        friend parsing::Parser;
     public:
         enum Value {
             UNRECOGNIZED, // no valid token found
 
             // --- Keywords ---
             KW_FUNCTION, // fn
-            KW_LET, // let
             KW_IF, // if
             KW_ELSE, // else
             KW_LOOP, // loop
@@ -26,24 +30,29 @@ namespace lexer {
             KW_TRUE, // true
             KW_FALSE, // false
             KW_NULL, // null
+            KW_INFINITY, // infinity
+            KW_NEG_INFINITY, // -infinity
+            KW_NAN, // nan
 
             // --- Punctuation ---
             PUNC_SEMICOLON, // ;
+            PUNC_DECLARATION, // :=
+            PUNC_CALL, // $
             PUNC_PLUS, // +
             PUNC_MINUS, // -
             PUNC_MULT, // *
             PUNC_DIV, // /
             PUNC_MOD, // %
-            PUNC_DOT, // .
+            PUNC_INDEX, // .
             PUNC_COMMA, // ,
             PUNC_AND, // &&
             PUNC_OR, // ||
-            PUNC_EQ, // ==
+            PUNC_DOUBLE_EQ, // ==
             PUNC_NEQ, // !=
             PUNC_LEQ, // <=
             PUNC_GEQ, // >=
-            PUNC_ASSIGN, // =
-            PUNC_BITAND, // &
+            PUNC_EQ, // =
+            PUNC_AMPERSAND, // &
             PUNC_BITOR, // |
             PUNC_XOR, // ^
             PUNC_NOT, // !
@@ -53,8 +62,8 @@ namespace lexer {
             PUNC_R_BRACKET, // ]
             PUNC_L_BRACE, // {
             PUNC_R_BRACE, // }
-            PUNC_L_ANGLE, // <
-            PUNC_R_ANGLE, // >
+            PUNC_LT, // <
+            PUNC_GT, // >
 
             // --- Literals ---
             LIT_HEX_NUMBER, // 0x[\dA-Fa-f]+
@@ -65,7 +74,8 @@ namespace lexer {
 
             // --- Miscellaneous ---
             COMMENT, //  /\*.*?\*/
-            IDENTIFIER // [A-Za-z_][A-Za-z_\d]*
+            IDENTIFIER, // [A-Za-z_][A-Za-z_\d]*
+            END_OF_FILE
         };
         TokenType() = default;
         explicit TokenType(Value val) : value(val) {}
@@ -90,10 +100,12 @@ namespace lexer {
 
     class Token {
         friend Lexer;
+        friend parsing::Parser;
 
         std::string * parent;
         size_t start;
         size_t end;
+        exceptions::FilePosition position { 1, 1 };
         TokenType type;
     public:
         Token() : parent(nullptr), start(0), end(0), type() {}
@@ -102,7 +114,7 @@ namespace lexer {
             : parent(p), start(s), end(e), type(t)
         {}
         /// @brief Returns the file position of the token.
-        exceptions::FilePosition getPosition() const;
+        exceptions::FilePosition getPosition() const { return position; };
         /// @brief Returns the type of the token.
         TokenType getType() const { return type; }
         /// @brief Returns the start index of the token.
@@ -110,7 +122,9 @@ namespace lexer {
         /// @brief Returns the end index of the token.
         size_t getEnd() const { return end; }
         /// @brief Returns the substring of the parent string that the token spans over.
-        std::string to_string() const;
+        std::string span() const;
+        /// @brief Returns a formatted display of the token.
+        std::string display() const;
     };
 
     class Lexer {
@@ -118,6 +132,7 @@ namespace lexer {
         // We store the data length so we don't have to keep computing it
         const size_t dataLength;
         size_t index = 0;
+        exceptions::FilePosition position { 1, 1 };
 
         // fuck utf8 support i need o(1)
         char byteAt(const size_t index) const {
@@ -131,6 +146,8 @@ namespace lexer {
         /// @param token A token to write to. This is left untouched if the function returns false.
         /// @return Whether the string was found.
         bool chompString(const std::string& needle, Token & token);
+
+        void incrementPosition();
 
     public:
         explicit Lexer(std::string &data);

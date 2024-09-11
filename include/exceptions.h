@@ -5,16 +5,22 @@
 #include <string>
 #include <utility>
 
+namespace runtime {
+    struct Stackframe;
+}
+
+namespace lexer {
+    class TokenType;
+}
+
 namespace parsing {
     enum struct ParserState;
 }
 
-namespace lexer { class Token; }
-
 namespace exceptions {
     struct FilePosition {
-        size_t line;
-        size_t column;
+        size_t line = 1;
+        size_t column = 1;
 
         std::string to_string() const {
             std::ostringstream stream;
@@ -22,6 +28,11 @@ namespace exceptions {
             return stream.str();
         }
     };
+}
+
+
+namespace lexer { class Token; }
+namespace exceptions {
 
     class SyntaxError: public std::exception {
         std::string formatted;
@@ -34,10 +45,13 @@ namespace exceptions {
         }
 
         static SyntaxError unexpectedEOF(const FilePosition position) {
-            return SyntaxError("unexpected end of file", position);
+            return {"unexpected end of file", position};
         }
 
         static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state);
+        static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state, lexer::TokenType expected);
+
+        static SyntaxError invalidToken(const lexer::Token &token, const std::string &why);
 
         const char * what() const noexcept override {
             return formatted.c_str();
@@ -57,13 +71,11 @@ namespace exceptions {
         }
     };
 
-    class RuntimeError final: public std::exception {
+    class RuntimeError: public std::exception {
         std::string formatted;
     public:
         std::string message;
-        explicit RuntimeError(std::string msg) : message(std::move(msg)) {
-            formatted = "runtime error: " + message;
-        }
+        explicit RuntimeError(const runtime::Stackframe & frame, std::string msg);
 
         const char * what() const noexcept override { return formatted.c_str(); }
     };

@@ -1,113 +1,283 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "value.h"
 #include "lexer.h"
 
+namespace runtime {
+    struct Stackframe;
+}
+
 namespace parsing {
     /// The parser's current state.
     enum struct ParserState {
-        ROOT, DECLARATION_IDENT, FUNCTION_IDENT, FUNCTION_OPEN_PAREN, ARGLIST_ROOT, ARGLIST_NEXT, BLOCK, ARGLIST_COMMA,
-        STATEMENT, FUNCTION_BLOCK, BLOCK_START
+        ROOT, DECLARATION_IDENT, FUNCTION_IDENT, FUNCTION_OPEN_PAREN, ARGLIST_NEXT, BLOCK, ARGLIST_COMMA,
+        STATEMENT, BLOCK_START, DECLARATION_ASSIGN_OR_END,
+        EXPRESSION, STATEMENT_SEMICOLON, RETURN_EXPRESSION_OR_END, IF_PREDICATE,
+        BINARY_LHS, BINARY_RHS, CALL_IDENT, UNARY_VALUE, RETURN_END, LIST_NEXT, MAP_KEY,
+        CALL_ARGS_NEXT, CALL_L_PAREN, CALL_ARG_EXPR, CALL_ARGS_COMMA,
+        IF_TRUE, IF_FALSE, IF_ELSE,
+        LIST_COMMA, LIST_EXPR,
+        MAP_KEY_STRING, MAP_EQ, MAP_VALUE, MAP_COMMA,
+        STATEMENT_EXPRESSION,
+        DECLARATION_END,
+        BLOCK_STATEMENT, GLOBAL_DECLARATION,
+        FUNCTION_STATEMENT, LOOP_STATEMENT,
     };
 
     class Atom {
-        // HACK: force this to be polymorphic
-        virtual void __HACK() {}
+    public:
+        exceptions::FilePosition position;
+        virtual std::string to_string() {
+            return "???";
+        }
+        virtual ~Atom() = default;
     };
     /// A top-level item in the file, like a global variable or a function.
-    class Item: public Atom {
-    public:
-        virtual ~Item() = default;
-    };
+    class Item: public Atom {};
     // The entire file.
     class Root final: public Atom {
     public:
-        std::vector<std::shared_ptr<Item>> items;
+        std::vector<std::shared_ptr<Item>> items {};
+        std::string to_string() override {
+            std::stringstream str;
+            for (const auto& item : items) {
+                str << item->to_string() << "; ";
+            }
+            return str.str();
+        }
     };
     /// A statement, like a variable declaration or return.
     class Statement: public Atom {};
+    /// A syntactic block of statements.
+    class Block final: public Statement {
+    public:
+        std::vector<std::shared_ptr<Statement>> statements {};
+
+        std::string to_string() override {
+            std::stringstream ss;
+            ss << "{";
+            for (const auto& stmt : statements)
+                ss << stmt->to_string() << " ";
+            ss << "}";
+            return ss.str();
+        }
+    };
     class Expression: public Atom {
+    public:
         /// Assigns a value to the place this expression represents.
-        virtual void assign(value::AbstractValue value) {
-            throw exceptions::RuntimeError("expression is not an lvalue");
+        virtual value::Value *pointer(runtime::Stackframe &frame) {
+            throw exceptions::RuntimeError(frame, "expression does not support assignment: " + to_string());
         }
         /// Evaluates the rvalue and returns a result.
-        virtual value::AbstractValue result() {
-            throw exceptions::RuntimeError("expression is not an rvalue");
+        virtual value::Value result(runtime::Stackframe & frame) {
+            throw std::runtime_error("internal runtime error: cannot evaluate expression: " + to_string());
         }
     };
-    /// A literal value.
-    class Literal final: public Atom, public Expression {
+    class ExpressionStatement: public Statement {
     public:
-        value::AbstractValue value;
-        value::AbstractValue result() override { return value; };
+        std::shared_ptr<Expression> expr;
 
+        std::string to_string() override { return (expr ? expr->to_string() : "<nullptr>") + ";"; }
+    };
+    /// A literal value.
+    class Literal final: public Expression {
+    public:
+        value::Value value;
+        value::Value result(runtime::Stackframe & frame) override {
+            return value;
+        };
         Literal() = default;
 
-        explicit Literal(const value::AbstractValue& v) : value(v) {};
+        std::string to_string() override {
+            return value.raw_string();
+        }
+
+        explicit Literal(const value::Value &v) : value(v) {};
+    };
+    /// A binary expression.
+    class BinaryOp final: public Expression {
+    public:
+        lexer::TokenType opr;
+        std::shared_ptr<Expression> lhs = std::make_shared<Literal>();
+        std::shared_ptr<Expression> rhs = std::make_shared<Literal>();
+
+        value::Value *pointer(runtime::Stackframe &frame) override;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        explicit BinaryOp(lexer::TokenType _opr): opr(_opr) {}
+        std::string to_string() override {
+            return opr.to_string() + " " + lhs->to_string() + " " + rhs->to_string();
+        }
+    };
+    /// A unary expression.
+    class UnaryOp final: public Expression {
+    public:
+        lexer::TokenType opr;
+        std::shared_ptr<Expression> value = std::make_shared<Literal>();
+
+        value::Value result(runtime::Stackframe & frame) override;
+
+        explicit UnaryOp(lexer::TokenType _opr): opr(_opr) {}
+
+        std::string to_string() override {
+            return opr.to_string() + " " + value->to_string();
+        }
     };
     /// A function call.
-    class Call final: public Atom, public Expression {
+    class Call final: public Expression {
     public:
         std::string functionName;
-        std::vector<std::shared_ptr<Expression>> arguments;
-        void assign(value::AbstractValue value) override;
-        value::AbstractValue result() override;
+        std::vector<std::shared_ptr<Expression>> arguments {};
+        value::Value result(runtime::Stackframe & frame) override;
+
+        std::string to_string() override {
+            std::ostringstream ss;
+            ss << "$ " << functionName << " (";
+            for (const auto& arg : arguments) {
+                ss << arg->to_string() << ", ";
+            }
+            ss << ")";
+            return ss.str();
+        }
     };
     /// An identifier.
-    class Identifier final: public Atom, public Expression {
+    class Identifier final: public Expression {
     public:
         std::string name;
-        void assign(value::AbstractValue value) override;
-        value::AbstractValue result() override;
-    };
-    /// An index into an lvalue using an rvalue.
-    class Index final: public Atom, public Expression {
-    public:
-        std::shared_ptr<Expression> target;
-        std::shared_ptr<Expression> index;
-        void assign(value::AbstractValue value) override;
-        value::AbstractValue result() override;
+
+        value::Value *pointer(runtime::Stackframe &frame) override;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        std::string to_string() override {
+            return name;
+        }
+
+        explicit Identifier(std::string str = "") : name(std::move(str)) {}
     };
     /// Breaking out of a loop.
-    class Break final: public Statement, public Atom {};
+    class Break final: public Statement {
+        std::string to_string() override {
+            return "break";
+        }
+    };
     /// Continuing to the next iteration of a loop.
-    class Continue final: public Statement, public Atom {};
+    class Continue final: public Statement {
+        std::string to_string() override {
+            return "continue";
+        }
+    };
     /// Returning a value from a function.
-    class Return final: public Statement, public Atom {
+    class Return final: public Statement {
     public:
-        std::shared_ptr<Expression> value;
+        std::shared_ptr<Expression> value = std::make_shared<Literal>();
+        Return() {
+            value = std::make_shared<Literal>();
+        }
+
+        std::string to_string() override {
+            return "return " + value->to_string();
+        }
     };
     /// A declaration of a variable to a value;
-    class Declaration final: public Statement, public Item, public Atom {
+    class Declaration final: public Statement, public Item {
     public:
         std::string name;
-        std::shared_ptr<Expression> value;
-    };
-    /// An assignment of an lvalue to an rvalue.
-    class Assignment final: public Statement, public Atom {
-    public:
-        std::shared_ptr<Expression> lhs;
-        std::shared_ptr<Expression> rhs;
+        std::shared_ptr<Expression> value = std::make_shared<Literal>();;
+        Declaration() {
+            value = std::make_shared<Literal>();
+        }
+
+        std::string to_string() override {
+            return ":= " + name + " " + value->to_string();
+        }
     };
     /// A top level declaration of a function.
-    class Function final: public Item, public Atom {
+    class Function final: public Item {
     public:
         std::string name;
-        std::vector<std::string> arguments;
-        std::vector<std::shared_ptr<Statement>> body;
+        std::vector<std::string> arguments {};
+        std::shared_ptr<Statement> body;
+
+        std::string to_string() override {
+            std::ostringstream ss;
+            ss << "fn " + name + "(";
+            for (const auto& arg : arguments) {
+                ss << arg << ", ";
+            }
+            ss << ") " << (body ? body->to_string() : "<nullptr>");
+            return ss.str();
+        }
+    };
+    /// Alternation based on a predicate.
+    class IfElse final: public Statement {
+    public:
+        std::shared_ptr<Expression> predicate = std::make_shared<Literal>();
+        std::shared_ptr<Statement> truePath;
+        std::shared_ptr<Statement> falsePath;
+
+        std::string to_string() override {
+            std::ostringstream ss;
+            ss << "if " + predicate->to_string() << " "
+                << (truePath ? truePath->to_string() : "<nullptr>")
+                << " else " << (falsePath ? falsePath->to_string() : "<nullptr>");
+            return ss.str();
+        }
+    };
+    /// Repeated code execution.
+    class Loop final: public Statement {
+    public:
+        std::shared_ptr<Statement> body;
+        std::string to_string() override {
+            return "loop " + (body ? body->to_string() : "<nullptr>");
+        }
     };
 
+    class List final: public Expression {
+    public:
+        std::vector<std::shared_ptr<Expression>> members;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        std::string to_string() override {
+            std::ostringstream ss;
+            ss << "[";
+            for (auto member : members) {
+                ss << member->to_string() << ", ";
+            }
+            ss << "]";
+            return ss.str();
+        }
+    };
+
+    class Map final: public Expression {
+        friend Parser;
+        std::string nextKey;
+    public:
+        std::unordered_map<std::string, std::shared_ptr<Expression>> pairs;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        std::string to_string() override {
+            std::ostringstream ss;
+            ss << "(";
+            for (auto pair : pairs) {
+                ss << "\"" << pair.first << "\" = " << pair.second->to_string() << ", ";
+            }
+            ss << ")";
+            return ss.str();
+        }
+    };
+
+
     class Parser {
+    public:
         lexer::Token lastToken;
         std::vector<ParserState> stateStack { ParserState::ROOT };
         std::shared_ptr<Root> syntaxTree;
         std::vector<std::shared_ptr<Atom>> treeCursor;
 
-    public:
         Parser() {
             const auto root = std::make_shared<Root>();
             syntaxTree = root;
