@@ -12,8 +12,8 @@ SRCS=$(wildcard $(SRCDIR)/*.cpp)
 OBJECTS=$(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SRCS))
 HEADS=$(wildcard $(INCLUDEDIR)/*.h)
 
-LDFLAGS=-g
-CPPFLAGS=-g -I$(INCLUDEDIR)
+LDFLAGS=-O3
+CPPFLAGS=-O3 -I$(INCLUDEDIR)
 
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $^
