@@ -111,8 +111,6 @@ fn main(args) {
 
     if != "cbacbacba" * "cba" 3 $std::crash("oh no");
 
-    $std::println($std::input("boolean"));
-
     $std::println(. map "x");
 
     = .map "y" 5;
