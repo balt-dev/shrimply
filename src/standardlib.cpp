@@ -27,6 +27,14 @@ struct Print final: AbstractFunction {
     }
 };
 
+struct PrintLine final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        std::cout << args[0].to_string() << std::endl;
+        return {};
+    }
+};
+
 struct TypeOf final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
@@ -294,6 +302,7 @@ struct Parse final: AbstractFunction {
 std::shared_ptr<runtime::Module> initStdlib() {
     std::shared_ptr<runtime::Module> std = std::make_shared<runtime::Module>(true);
     std->functions["print"] = std::make_shared<Print>();
+    std->functions["println"] = std::make_shared<PrintLine>();
     std->functions["typeof"] = std::make_shared<TypeOf>();
     std->functions["crash"] = std::make_shared<Crash>();
     std->functions["length"] = std::make_shared<Length>();

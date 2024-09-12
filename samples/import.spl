@@ -1,3 +1,7 @@
+use import::wawa;
+
+
+:= ago 5;
 
 fn function(x) {
     return + x 5;

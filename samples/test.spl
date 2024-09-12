@@ -81,12 +81,20 @@ fn main(args) {
 
     := i 0;
     loop {
-        $std::print(i);
+        $std::println(i);
         if >= i 10 break;
         = i + i 1;
     }
 
-    $std::print(0x);
+    := map ("x" = 5, "x" = 4);
+
+    = import::ago 7;
+    $std::println(import::wawa::x);
+
+    $std::println(. map "x");
+
+    = .map "y" 5;
+    $std::print(["y", . map "y"]);
 
     if false return 5; else if false { return 3; } else return 0;
 }

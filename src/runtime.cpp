@@ -46,8 +46,9 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             if ( std::shared_ptr<std::unordered_map<std::string, Value>> map {}; lhs->result(frame).asMap(map) ) {
                 auto index = rhs->result(frame);
                 auto access = index.asString();
-                if (map->find(access) == map->end()) throw RuntimeError(frame, "index does not exist in map: " + index.raw_string());
-                return map->at(access);
+                auto iter = map->find(access);
+                if (iter == map->end()) throw RuntimeError(frame, "index does not exist in map: " + index.raw_string());
+                return iter->second;
             }
             throw RuntimeError(frame, "cannot index into value " + left.raw_string());
         }
@@ -62,7 +63,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             auto left = lhs->result(frame);
             frame.sourcePos = rhs->position;
             auto right = rhs->result(frame);
-            if (left.getTag() == Value::ValueType::String)
+            if (left.getTag() == Value::ValueType::String || right.getTag() == Value::ValueType::String)
                 return Value(left.asString() + right.asString());
             if (left.getTag() == Value::ValueType::Integer && right.getTag() == Value::ValueType::Integer)
                 return Value(left.integer + right.integer);
@@ -84,7 +85,10 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             auto left = lhs->result(frame);
             frame.sourcePos = rhs->position;
             auto right = rhs->result(frame);
-            if (left.getTag() == Value::ValueType::String) {
+            if (
+                long long count;
+                left.getTag() == Value::ValueType::String && right.asInteger(count)
+            ) {
                 std::ostringstream ss;
                 for (auto i = 0; i < right.integer; i++) {
                     ss << left.string;
@@ -238,7 +242,7 @@ Value *parsing::BinaryOp::pointer(Stackframe &frame) {
             auto index = rhs->result(frame);
             auto access = index.asString();
             if (map->find(access) == map->end()) {
-                map->at(access) = Value();
+                map->operator[](access) = Value();
             }
             return &map->at(access);
         }

@@ -1,5 +1,5 @@
 
-:= x 5;
+:= x "this is deep";
 
 
 fn amongus(x) {
