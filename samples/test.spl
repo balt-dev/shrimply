@@ -102,7 +102,12 @@ fn main(args) {
 
     = ? false foo bar 3;
 
+    $std::println(? > $std::math::rand() 0.5 "heads" "tails");
+
     $std::println([foo, bar]);
+    $std::println("te\nst");
+    $std::println(["te\nst"]);
+    $std::println(["te\xA0\xA0st"]);
 
     $std::println(. map "x");
 

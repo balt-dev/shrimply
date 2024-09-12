@@ -170,7 +170,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             long long x, y;  \
             if (!(left.asInteger(x) && right.asInteger(y))) throw RuntimeError(frame, \
                 "cannot apply bitwise " name " to values " + \
-                left.to_string() + " and " + right.to_string()\
+                left.raw_string() + " and " + right.raw_string()\
             ); \
             return Value(x opr y); \
         }

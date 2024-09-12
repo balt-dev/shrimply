@@ -19,6 +19,24 @@ std::string operator ""_str(const char* buf, size_t len) {
 
 // Base
 
+struct Input final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        auto target = args[0].raw_string();
+#define TRY_INPUT(name, type) if (target == #name) { type input; std::cin >> input >> std::ws; if (!std::cin) throw RuntimeError(frame, "could not parse user input as " #name); return Value(input); }
+        TRY_INPUT(number, double);
+        TRY_INPUT(integer, long long);
+        TRY_INPUT(boolean, bool);
+        if (target == "string") {
+            std::string input;
+            std::getline(std::cin, input);
+            if (!std::cin) throw RuntimeError(frame, "failed to read input");
+            return Value(input);
+        }
+        throw RuntimeError(frame, "cannot get input for type " + args[0].raw_string());
+    }
+};
+
 struct Print final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
@@ -55,7 +73,7 @@ struct TypeOf final: AbstractFunction {
 struct Crash final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
-        throw RuntimeError(frame, args[0].to_string());
+        throw RuntimeError(frame, args[0].raw_string());
     }
 };
 
@@ -83,7 +101,7 @@ struct Push final: AbstractFunction {
         EXPECT_ARGC(2);
         const Value& list = args[0];
         const Value& value = args[1];
-        if (list.tag != Value::ValueType::List) throw RuntimeError(frame, "cannot push to non-list: " + list.to_string());
+        if (list.tag != Value::ValueType::List) throw RuntimeError(frame, "cannot push to non-list: " + list.raw_string());
         list.list->push_back(value);
         return {};
     }
@@ -93,7 +111,7 @@ struct Pop final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
         const Value& list = args[0];
-        if (list.tag != Value::ValueType::List) throw RuntimeError(frame, "cannot pop from non-list: " + list.to_string());
+        if (list.tag != Value::ValueType::List) throw RuntimeError(frame, "cannot pop from non-list: " + list.raw_string());
         if (list.list->empty()) throw RuntimeError(frame, "cannot pop from empty list");
         auto back = list.list->back();
         list.list->pop_back();
@@ -107,8 +125,8 @@ struct Remove final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(2);
         const Value& map = args[0];
-        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot remove from non-map: " + map.to_string());
-        const std::string key = args[1].to_string();
+        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot remove from non-map: " + map.raw_string());
+        const std::string key = args[1].raw_string();
         const auto it = map.map->find(key);
         if (it == map.map->end()) throw RuntimeError(frame, "key does not exist in map: " + key);
         auto val = it->second;
@@ -121,7 +139,7 @@ struct Keys final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
         const Value& map = args[0];
-        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot get keys of non-map: " + map.to_string());
+        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot get keys of non-map: " + map.raw_string());
         auto keys = std::make_shared<std::vector<Value>>();
         keys->reserve(map.map->size());
         for (const auto& pair : *map.map) keys->emplace_back(pair.first);
@@ -133,7 +151,7 @@ struct Values final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
         const Value& map = args[0];
-        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot get values of non-map: " + map.to_string());
+        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot get values of non-map: " + map.raw_string());
         auto values = std::make_shared<std::vector<Value>>();
         values->reserve(map.map->size());
         for (const auto& pair : *map.map) values->push_back(pair.second);
@@ -145,8 +163,8 @@ struct Contains final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(2);
         const Value& map = args[0];
-        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot find value in non-map: " + map.to_string());
-        const std::string key = args[1].to_string();
+        if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot find value in non-map: " + map.raw_string());
+        const std::string key = args[1].raw_string();
         const auto it = map.map->find(key);
         return Value(it != map.map->end());
     }
@@ -157,7 +175,7 @@ struct Contains final: AbstractFunction {
 struct Substring final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(3);
-        const std::string haystack = args[0].to_string();
+        const std::string haystack = args[0].asString();
         long long start; EXPECT_TYPE(start, args[1], asInteger, "integer");
         long long end; EXPECT_TYPE(end, args[2], asInteger, "integer");
         if (start > end) throw RuntimeError(frame, "substring start cannot be greater than end");
@@ -170,8 +188,8 @@ struct Substring final: AbstractFunction {
 struct Find final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(2);
-        const std::string haystack = args[0].to_string();
-        const std::string needle = args[1].to_string();
+        const std::string haystack = args[0].asString();
+        const std::string needle = args[1].asString();
         long long index = 0;
         if (args.size() >= 2) EXPECT_TYPE(index, args[2], asInteger, "integer");
         return Value((long long) haystack.find(needle, index));
@@ -317,11 +335,13 @@ struct Rand final: AbstractFunction {
 
         // Reinterpret
         union {
-            uint64_t i = res;
+            uint64_t i;
             double f;
         };
 
-        // Subtract 1 and return
+        i = res;
+
+        // Subtract 1 from [1, 2) and return
         return Value ( f - 1 );
     }
 };
@@ -330,7 +350,7 @@ struct Parse final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> &args) override {
         EXPECT_ARGC(1);
         std::stringstream stream;
-        stream << args[0].to_string();
+        stream << args[0].raw_string();
         double value;
         stream >> value;
         if (stream.fail())

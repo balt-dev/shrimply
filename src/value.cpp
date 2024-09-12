@@ -9,7 +9,28 @@ std::string Value::raw_string(std::unordered_set<unsigned long long> seenIds) co
     if (seenIds.find(id) != seenIds.end()) return "...";
     switch (tag) {
         case ValueType::Null: return "null";
-        case ValueType::String: return "\"" + string + "\"";
+        case ValueType::String: {
+            std::ostringstream stream;
+            stream << std::hex << '"';
+            for (char chr : string) {
+                switch (chr) {
+                    case '\n': stream << "\\n"; break;
+                    case '\t': stream << "\\t"; break;
+                    case '\r': stream << "\\r"; break;
+                    case '\\': stream << "\\\\"; break;
+                    case '"': stream << "\\\""; break;
+                    default: {
+                        if (chr < 0x20 || chr > 0x7F) {
+                            stream << "\\x" << std::setw(2) << std::uppercase << (int) (unsigned char) chr;
+                        } else {
+                            stream << chr;
+                        }
+                    }
+                }
+            }
+            stream << '"';
+            return stream.str();
+        };
         case ValueType::Boolean: return boolean ? "true" : "false";
         case ValueType::Integer: return std::to_string(integer);
         case ValueType::Number: return std::to_string(number);
