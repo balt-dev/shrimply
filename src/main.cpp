@@ -14,7 +14,7 @@ int main( int argc, char * argv[]) {
 
     std::filesystem::path filename;
     try {
-        filename = {argv[1]};
+        filename = std::filesystem::path(argv[1]);
     } catch (std::exception& _) {
         std::cerr << "filesystem error: couldn't parse filename" << std::endl;
         return 1;
