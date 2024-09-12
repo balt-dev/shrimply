@@ -17,3 +17,9 @@ cd shrimply
 make clean all
 ```
 After running this, the compiled program should be in the `lib` directory.
+
+## Licensing
+
+This project is licensed under the MIT license.
+
+If you _are_ using this commercially, please reconsider. Again, I wrote this _in a week_.
