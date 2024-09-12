@@ -345,13 +345,13 @@ struct AsInteger final: AbstractFunction {
 
 struct Rand final: AbstractFunction {
     Rand () {
-        srand(time(nullptr) * getpid());
+        srand(time(nullptr));
     }
 
     Value call(Stackframe &frame, std::vector<Value> &args) override {
         if (!args.empty()) {
             if (args[0].tag == Value::ValueType::Null)
-                srand(time(nullptr) * getpid());
+                srand(time(nullptr));
             else {
                 int64_t seed;
                 EXPECT_TYPE(seed, args[0], asInteger, "integer");
