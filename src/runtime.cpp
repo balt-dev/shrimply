@@ -107,7 +107,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
                 left.getTag() == Value::ValueType::String && right.asInteger(count)
             ) {
                 std::ostringstream ss;
-                for (auto i = 0; i < right.integer; i++) {
+                for (auto i = 0; i < count; i++) {
                     ss << left.string;
                 }
                 return Value(ss.str());
