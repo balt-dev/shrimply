@@ -211,6 +211,7 @@ bool Lexer::advanceToken(Token & token) {
 
         while ( !atEnd() && isxdigit(rawData[index]))
             incrementPosition();
+
         token.end = index;
         return true;
     }
@@ -221,6 +222,7 @@ bool Lexer::advanceToken(Token & token) {
 
         while ( !atEnd() && (rawData[index] == '0' || rawData[index] == '1'))
             incrementPosition();
+
         token.end = index;
         return true;
     }

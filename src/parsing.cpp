@@ -513,39 +513,24 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                         THROW_INVALID("number is out of range");
                     }
                 }
-                case TokenType::LIT_HEX_NUMBER: {
-                    stateStack.pop_back();
-                    try {
-                        long long number = (long long) std::stoull(token.span().substr(2), nullptr, 16);
-                        treeCursor.push_back(std::make_shared<Literal>(value::Value(number)));
-                        treeCursor.back()->position = token.getPosition();
-                        break;
-                    } catch (std::out_of_range& _) {
-                        THROW_INVALID("number is out of range");
-                    }
+#define BASE_LITERAL(base, type) \
+                case TokenType::type: { \
+                    stateStack.pop_back(); \
+                    auto span = token.span().substr(2); \
+                    try { \
+                        auto number = (long long) std::stoull(span, nullptr, base); \
+                        treeCursor.push_back(std::make_shared<Literal>(value::Value(number))); \
+                        treeCursor.back()->position = token.getPosition(); \
+                        break; \
+                    } catch (std::out_of_range& _) { \
+                        THROW_INVALID("number is out of range"); \
+                    } catch (std::invalid_argument& _) { \
+                        THROW_INVALID("could not convert to number: " + token.span()); \
+                    } \
                 }
-                case TokenType::LIT_BIN_NUMBER: {
-                    stateStack.pop_back();
-                    try {
-                        long long number = (long long) std::stoull(token.span().substr(2), nullptr, 2);
-                        treeCursor.push_back(std::make_shared<Literal>(value::Value(number)));
-                        treeCursor.back()->position = token.getPosition();
-                        break;
-                    } catch (std::out_of_range& _) {
-                        THROW_INVALID("number is too large");
-                    }
-                }
-                case TokenType::LIT_OCT_NUMBER: {
-                    stateStack.pop_back();
-                    try {
-                        long long number = (long long) std::stoull(token.span().substr(2), nullptr, 8);
-                        treeCursor.push_back(std::make_shared<Literal>(value::Value(number)));
-                        treeCursor.back()->position = token.getPosition();
-                        break;
-                    } catch (std::out_of_range& _) {
-                        THROW_INVALID("number is too large");
-                    }
-                }
+                BASE_LITERAL(16, LIT_HEX_NUMBER);
+                BASE_LITERAL(2, LIT_BIN_NUMBER);
+                BASE_LITERAL(8, LIT_OCT_NUMBER);
                 case TokenType::LIT_STRING: {
                     stateStack.pop_back();
                     auto unescaped = unescapeString(token, filename);

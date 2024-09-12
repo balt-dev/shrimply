@@ -70,12 +70,24 @@ fn main(args) {
     $std::print(x);
     $std::print("\n");
 
-    try $std::crash("uh oh");
-    recover name { $std::print(name); }
 
+    try / 1 0;
+    recover err $std::print(err);
+
+    := x null;
 
     $test(1, 2, 3);
     $test(1, 2);
+
+    := i 0;
+    loop {
+        $std::print(i);
+        if >= i 10 break;
+        = i + i 1;
+    }
+
+    $std::print(0x);
+
     if false return 5; else if false { return 3; } else return 0;
 }
 
