@@ -184,8 +184,8 @@ struct Substring final: AbstractFunction {
         int64_t start; EXPECT_TYPE(start, args[1], asInteger, "integer");
         int64_t end; EXPECT_TYPE(end, args[2], asInteger, "integer");
         if (start > end) throw RuntimeError(frame, "substring start cannot be greater than end");
-        if (0 > start && start > haystack.size()) throw RuntimeError(frame, "substring start out of bounds");
-        if (0 > end && end > haystack.size()) throw RuntimeError(frame, "substring end out of bounds");
+        if (0 > start || start > haystack.size()) throw RuntimeError(frame, "substring start out of bounds");
+        if (0 > end || end > haystack.size()) throw RuntimeError(frame, "substring end out of bounds");
         return Value(haystack.substr(start, end));
     }
 };
