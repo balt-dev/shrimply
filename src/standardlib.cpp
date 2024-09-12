@@ -383,7 +383,7 @@ std::shared_ptr<runtime::Module> initStdlib() {
     map->functions["values"] = std::make_shared<Values>();
     map->functions["contains"] = std::make_shared<Contains>();
     auto string = std::make_shared<runtime::Module>(true);
-    std->imported["string"] = map;
+    std->imported["string"] = string;
     string->functions["find"] = std::make_shared<Find>();
     string->functions["substring"] = std::make_shared<Substring>();
     auto math = std::make_shared<runtime::Module>(true);
