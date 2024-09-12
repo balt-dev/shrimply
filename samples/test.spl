@@ -103,6 +103,12 @@ fn main(args) {
     = ? false foo bar 3;
 
     $std::println(? > $std::math::rand() 0.5 "heads" "tails");
+    $std::println(== $std::math::rand(5) $std::math::rand(5));
+    $std::println($std::math::as_int(inf));
+
+    := str "Hello!";
+    $std::println($std::string::byte(str));
+    $std::println($std::string::char(0x41));
 
     $std::println([foo, bar]);
     $std::println("te\nst");

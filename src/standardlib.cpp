@@ -205,6 +205,42 @@ struct Find final: AbstractFunction {
     }
 };
 
+struct Upper final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        std::string val = args[0].asString();
+        for (auto & c: val) c = toupper((unsigned char) c);
+        return Value(val);
+    }
+};
+
+struct Lower final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        std::string val = args[0].asString();
+        for (auto & c: val) c = tolower((unsigned char) c);
+        return Value(val);
+    }
+};
+
+struct Byte final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        std::string val = args[0].asString();
+        if (val.empty()) throw RuntimeError(frame, "string cannot be empty");
+        return Value((int64_t) (unsigned char) val[0]);
+    }
+};
+
+struct Char final: AbstractFunction {
+    Value call(Stackframe &frame, std::vector<Value> & args) override {
+        EXPECT_ARGC(1);
+        int64_t chrInt;
+        EXPECT_TYPE(chrInt, args[0], asInteger, "integer");
+        if (chrInt < 1 || chrInt > 255) throw RuntimeError(frame, "number is out of range for valid string character: " + std::to_string(chrInt));
+        return Value(std::string(1, (unsigned char) chrInt));
+    }
+};
 // math
 
 struct Pow final: AbstractFunction {
@@ -382,6 +418,10 @@ std::shared_ptr<runtime::Module> initStdlib() {
     std->imported["string"] = string;
     string->functions["find"] = std::make_shared<Find>();
     string->functions["substring"] = std::make_shared<Substring>();
+    string->functions["upper"] = std::make_shared<Upper>();
+    string->functions["lower"] = std::make_shared<Lower>();
+    string->functions["byte"] = std::make_shared<Byte>();
+    string->functions["char"] = std::make_shared<Char>();
     auto math = std::make_shared<runtime::Module>(true);
     std->imported["math"] = math;
     math->globals["pi"] = Value(M_PI);
