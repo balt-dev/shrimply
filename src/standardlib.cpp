@@ -131,7 +131,7 @@ struct Remove final: AbstractFunction {
         EXPECT_ARGC(2);
         const Value& map = args[0];
         if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot remove from non-map: " + map.raw_string());
-        const std::string key = args[1].raw_string();
+        const std::string key = args[1].to_string();
         const auto it = map.map->find(key);
         if (it == map.map->end()) throw RuntimeError(frame, "key does not exist in map: " + key);
         auto val = it->second;
@@ -169,7 +169,7 @@ struct Contains final: AbstractFunction {
         EXPECT_ARGC(2);
         const Value& map = args[0];
         if (map.tag != Value::ValueType::Map) throw RuntimeError(frame, "cannot find value in non-map: " + map.raw_string());
-        const std::string key = args[1].raw_string();
+        const std::string key = args[1].to_string();
         const auto it = map.map->find(key);
         return Value(it != map.map->end());
     }
@@ -355,7 +355,7 @@ struct Parse final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> &args) override {
         EXPECT_ARGC(1);
         std::stringstream stream;
-        stream << args[0].raw_string();
+        stream << args[0].to_string();
         double value;
         stream >> value;
         if (stream.fail())

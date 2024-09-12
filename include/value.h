@@ -14,6 +14,8 @@ namespace parsing {
 }
 
 namespace value {
+    std::string escapeString(const std::string& string);
+
     struct Null {};
 
     class Value final {

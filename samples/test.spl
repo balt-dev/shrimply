@@ -111,10 +111,18 @@ fn main(args) {
 
     if != "cbacbacba" * "cba" 3 $std::crash("oh no");
 
-    $std::println(. map "x");
-
     = .map "y" 5;
     $std::print(["y", . map "y"]);
+    $std::println(. map "x");
+
+    := list [];
+    try $std::list::pop(list); recover err $std::println(err);
+    $std::println(list);
+
+    = map ();
+    := v "among";
+    = . map v "us";
+    $std::println(map);
 
     if false return 5; else if false { return 3; } else return 0;
 }

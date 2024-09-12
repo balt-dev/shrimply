@@ -303,9 +303,8 @@ namespace parsing {
         std::string to_string() const override {
             std::ostringstream ss;
             ss << "(";
-            for (const auto& pair : pairs) {
-                ss << "\"" << pair.first << "\" = " << pair.second->to_string() << ", ";
-            }
+            for (const auto& pair : pairs)
+                ss << value::escapeString(pair.first) << " = " << pair.second->to_string() << ", ";
             ss << ")";
             return ss.str();
         }
