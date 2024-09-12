@@ -116,6 +116,7 @@ fn main(args) {
     $std::println(. map "x");
 
     $std::println($std::string::substring("homeowner", 2, 4));
+    $std::println($std::string::find("homeowner", "meow"));
 
     := list [];
     try $std::list::pop(list); recover err $std::println(err);

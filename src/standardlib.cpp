@@ -196,8 +196,12 @@ struct Find final: AbstractFunction {
         const std::string haystack = args[0].asString();
         const std::string needle = args[1].asString();
         int64_t index = 0;
-        if (args.size() >= 2) EXPECT_TYPE(index, args[2], asInteger, "integer");
-        return Value((int64_t) haystack.find(needle, index));
+        if (args.size() > 2) EXPECT_TYPE(index, args[2], asInteger, "integer");
+        if (needle.size() + index > haystack.size()) return Value((int64_t) -1);
+        if (needle.size() == haystack.size()) return Value((int64_t) (haystack == needle));
+        auto found = haystack.find(needle, index);
+        if (found == std::string::npos) return Value((int64_t) -1);
+        return Value((int64_t) found);
     }
 };
 
