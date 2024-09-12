@@ -12,5 +12,8 @@ Check the wiki for details!
 This project was built using g++ 14.2, using no external dependencies.
 
 ```
-git clone 
+git clone git@github.com:balt-dev/shrimply.git
+cd shrimply
+make clean all
 ```
+After running this, the compiled program should be in the `lib` directory.
