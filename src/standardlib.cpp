@@ -305,14 +305,6 @@ struct AsInteger final: AbstractFunction {
     }
 };
 
-struct AsNumber final: AbstractFunction {
-    Value call(Stackframe &frame, std::vector<Value> &args) override {
-        EXPECT_ARGC(1);
-        double value; EXPECT_TYPE(value, args[0], asNumber, "number");
-        return Value ( value );
-    }
-};
-
 struct Rand final: AbstractFunction {
     Rand () {
         srand(time(nullptr) * getpid());
@@ -406,7 +398,6 @@ std::shared_ptr<runtime::Module> initStdlib() {
     math->functions["abs"] = std::make_shared<Abs>();
     math->functions["floor"] = std::make_shared<Floor>();
     math->functions["as_int"] = std::make_shared<AsInteger>();
-    math->functions["as_num"] = std::make_shared<AsNumber>();
     math->functions["rand"] = std::make_shared<Rand>();
     math->functions["parse"] = std::make_shared<Parse>();
     return std;
