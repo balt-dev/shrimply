@@ -14,4 +14,6 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: build
-      run: make clean all test
+      run: 
+        g++ --version
+        make clean all test
