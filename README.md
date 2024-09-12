@@ -7,7 +7,9 @@ it's as shrimple as that
 
 A simple programming language written in C++ in about a week as a learning exercise.
 
-Check the wiki for details!
+Check the wiki for details! You can get a copy in the releases tab on the right.
+
+## Compiling
 
 This project was built using g++ 14.2, using no external dependencies.
 
