@@ -772,7 +772,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
             tryrecv->binding = *path;
             stateStack.back() = ParserState::RECV_STATEMENT;
             stateStack.push_back(ParserState::STATEMENT);
-            break;
+            goto reinterpret;
         }
         case ParserState::RECV_STATEMENT: {
             TRY_DOWNCAST_HEAD(stmt, Statement);
@@ -780,7 +780,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
             TRY_DOWNCAST_HEAD(tryrecv, TryRecover);
             tryrecv->sadPath = stmt;
             stateStack.pop_back();
-            break;
+            goto reinterpret;
         }
     }
 }

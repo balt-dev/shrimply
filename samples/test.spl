@@ -57,17 +57,26 @@ fn test() {
 }
 
 fn main(args) {
+    $std::print(+ + "" args "\n");
     := map ("3" = 1, "4" = 5);
     $estimate_recursion_depth_limit();
 
-    try {
-        $std::crash("uh oh");
-    } recover err {
-        $std::print(err);
+    $std::print("\n");
+    := x 5;
+    {
+        := x 3;
+        $std::print(x);
     }
+    $std::print(x);
+    $std::print("\n");
+
+    try $std::crash("uh oh");
+    recover name { $std::print(name); }
+
 
     $test(1, 2, 3);
     $test(1, 2);
+    if false return 5; else if false { return 3; } else return 0;
 }
 
 /*

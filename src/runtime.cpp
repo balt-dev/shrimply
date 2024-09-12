@@ -548,9 +548,11 @@ void handleStatement(Stackframe & frame, const std::shared_ptr<Statement>& stmt)
         try {
             handleStatement(childFrame, tryrecv->happyPath);
         } catch (RuntimeError & err) {
-            childFrame.variables = {};
-            childFrame.assignVariable(tryrecv->binding, Value(err.message));
-            handleStatement(childFrame, tryrecv->sadPath);
+            if (!tryrecv->binding.members.empty()) {
+                childFrame.variables = {};
+                childFrame.assignVariable(tryrecv->binding, Value(err.message));
+                handleStatement(childFrame, tryrecv->sadPath);
+            }
         }
     } else IF_DOWNCAST(Loop, loop) {
         while (true) {
