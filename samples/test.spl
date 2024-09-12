@@ -107,7 +107,7 @@ fn main(args) {
     $std::println($std::math::as_int(inf));
 
     := str "Hello!";
-    $std::println($std::string::byte(str));
+    $std::println($std::string::byte(str, 3));
     $std::println($std::string::char(0x41));
 
     $std::println([foo, bar]);

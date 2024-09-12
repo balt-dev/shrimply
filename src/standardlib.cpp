@@ -228,7 +228,10 @@ struct Byte final: AbstractFunction {
         EXPECT_ARGC(1);
         std::string val = args[0].asString();
         if (val.empty()) throw RuntimeError(frame, "string cannot be empty");
-        return Value((int64_t) (unsigned char) val[0]);
+        int64_t index = 0;
+        if (args.size() > 1) EXPECT_TYPE(index, args[1], asInteger, "integer");
+        if (index < 0 || index >= val.size()) throw RuntimeError(frame, "index is out of bounds for string");
+        return Value((int64_t) (unsigned char) val[index]);
     }
 };
 
