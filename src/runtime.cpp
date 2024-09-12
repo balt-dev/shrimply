@@ -584,16 +584,17 @@ void handleFrame(Stackframe & frame) {
 }
 
 Value SyntaxFunction::call(Stackframe &frame, std::vector<Value> & args) {
-    std::unordered_map<std::string, Value> variables {};
+    std::unordered_map<std::string, Value> variables = {};
     auto iter = argumentNames.begin();
     for (const auto& arg : args) {
+        if (iter == argumentNames.end()) break;
         variables[*iter] = arg;
         ++iter;
-        if (iter == argumentNames.end()) break;
     }
     for (; iter != argumentNames.end(); ++iter) {
         variables[*iter] = Value();
     }
+    variables["__ARGC"] = Value((long long) args.size());
     auto childFrame = frame.branch(pos);
     childFrame.variables = variables;
     childFrame.functionName = name;

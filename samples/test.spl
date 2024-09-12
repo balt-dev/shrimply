@@ -52,6 +52,10 @@ fn estimate_recursion_depth_limit(i) {
     }
 }
 
+fn test() {
+    $std::print(__ARGC);
+}
+
 fn main(args) {
     := map ("3" = 1, "4" = 5);
     $estimate_recursion_depth_limit();
@@ -62,7 +66,8 @@ fn main(args) {
         $std::print(err);
     }
 
-
+    $test(1, 2, 3);
+    $test(1, 2);
 }
 
 /*
