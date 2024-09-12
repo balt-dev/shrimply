@@ -22,19 +22,37 @@
     := arr [5, 3, + 4 2];
     = .arr 0 + 7 6; assign (index arr at 0) to (add 7 to 6);
 
-    $func (1, + 2 3) call func with (1, add 2 3)
+    $func (1, + 2 3); call func with (1, add 2 3)
+
+    try {
+        $std::raise(1);
+    } recover err {
+        $std::print(err);
+    }
 */
+
+use import;
+use import::wawa;
 
 := static 5;
 
 fn identity(x) { return x; }
 
 fn goober() {
-    $print(= + 0.1 0.2 0.3);
+    $std::print(x);
+}
+
+fn recursive(i) {
+    try {
+        $recursive(+ i 1);
+    } recover err {
+        $std::print(i);
+    }
 }
 
 fn main(args) {
-    $goober();
+    := map ("3" = 1, "4" = 5);
+    $std::print(inf);
 }
 
 /*

@@ -23,15 +23,17 @@ namespace value {
         enum struct ValueType {
             Null,
             Integer,
-            Double,
+            Number,
             Boolean,
             String,
             List,
-            Map
+            Map,
+            Extern
         };
-    private:
         static unsigned long long counter;
 
+        // Note: These were originally private, but I stopped caring.
+        // Nobody else is working on this anyways.
         union {
             long long integer;
             double number;
@@ -39,6 +41,7 @@ namespace value {
             std::string string;
             std::shared_ptr<std::vector<Value>> list;
             std::shared_ptr<std::unordered_map<std::string, Value>> map;
+            void* external;
         };
         ValueType tag;
 
@@ -50,15 +53,15 @@ namespace value {
             switch (source.tag) {
                 case ValueType::Null: break;
                 case ValueType::Integer: integer = source.integer; break;
-                case ValueType::Double: number = source.number; break;
+                case ValueType::Number: number = source.number; break;
                 case ValueType::Boolean: boolean = source.boolean; break;
                 case ValueType::String: new (&string) std::string(source.string); break;
                 case ValueType::List: new (&list) std::shared_ptr(source.list); break;
                 case ValueType::Map: new (&map) std::shared_ptr(source.map); break;
+                case ValueType::Extern: external = source.external; break;
             }
         }
 
-    public:
         Value(): boolean{false}, id(counter++) {}
 
         ~Value() {
@@ -82,38 +85,46 @@ namespace value {
             switch (tag) {
                 case ValueType::Null: return true;
                 case ValueType::Integer: return integer == other.integer;
-                case ValueType::Double: return number == other.number;
+                case ValueType::Number: return number == other.number;
                 case ValueType::Boolean: return boolean == other.boolean;
                 case ValueType::String: return string == other.string;
                 case ValueType::List: return list == other.list;
                 case ValueType::Map: return map == other.map;
+                case ValueType::Extern: return external == other.external;
             }
             return false;
         }
 
         explicit Value(const long long val): tag(ValueType::Integer), integer{val}, id(counter++) {}
-        explicit Value(const double val): tag(ValueType::Double), number{val}, id(counter++) {}
+        explicit Value(const double val): tag(ValueType::Number), number{val}, id(counter++) {}
         explicit Value(const bool val): tag(ValueType::Boolean), boolean{val}, id(counter++) {}
         explicit Value(std::string val): tag(ValueType::String), string{std::move(val)}, id(counter++) {}
         explicit Value(const std::shared_ptr<std::vector<Value>>& val): tag(ValueType::List), list{val}, id(counter++) {}
         explicit Value(const std::shared_ptr<std::unordered_map<std::string, Value>>& val): tag(ValueType::Map), map{val}, id(counter++) {}
 
+        // Note: This can't actually be a constructor! It would clash with the string one.
+        static Value fromPointer(void* ptr) {
+            Value value;
+            value.tag = ValueType::Extern;
+            value.external = ptr;
+            return value;
+        }
         ValueType getTag() const {
             return tag;
         }
 
         bool asInteger(long long & out) const {
-            if (tag == ValueType::Double) out = number;
+            if (tag == ValueType::Number) out = number;
             if (tag == ValueType::Boolean) out = boolean;
             if (tag == ValueType::Integer) out = integer;
-            return tag == ValueType::Integer || tag == ValueType::Boolean || tag == ValueType::Double;
+            return tag == ValueType::Integer || tag == ValueType::Boolean || tag == ValueType::Number;
         }
 
-        bool asDouble(double & out) const {
-            if (tag == ValueType::Double) out = number;
+        bool asNumber(double & out) const {
+            if (tag == ValueType::Number) out = number;
             if (tag == ValueType::Boolean) out = boolean;
             if (tag == ValueType::Integer) out = integer;
-            return tag == ValueType::Integer || tag == ValueType::Boolean  || tag == ValueType::Double;
+            return tag == ValueType::Integer || tag == ValueType::Boolean  || tag == ValueType::Number;
         }
 
         bool asBoolean() const {
@@ -121,10 +132,11 @@ namespace value {
                 case ValueType::Null: return false;
                 case ValueType::Boolean: return boolean;
                 case ValueType::Integer: return integer > 0;
-                case ValueType::Double: return number > 0;
+                case ValueType::Number: return number > 0;
                 case ValueType::String: return !string.empty();
                 case ValueType::List: return !list->empty();
                 case ValueType::Map: return !map->empty();
+                case ValueType::Extern: return false;
                 default: return false;
             }
         }

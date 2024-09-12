@@ -40,31 +40,18 @@ namespace exceptions {
         std::string message;
         const FilePosition position;
 
-        SyntaxError(std::string msg, const FilePosition pos) : message(std::move(msg)), position(pos) {
-            formatted = "syntax error at " + position.to_string() + ": " + message;
+        SyntaxError(std::string msg, const FilePosition pos, std::filesystem::path filename) : message(std::move(msg)), position(pos) {
+            formatted = "syntax error at " + position.to_string() + " in file \"" + filename.generic_string() + "\": " + message;
         }
 
-        static SyntaxError unexpectedEOF(const FilePosition position) {
-            return {"unexpected end of file", position};
+        static SyntaxError unexpectedEOF(const FilePosition position, std::filesystem::path filename) {
+            return {"unexpected end of file", position, std::move(filename)};
         }
 
-        static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state);
-        static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state, lexer::TokenType expected);
+        static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state, std::filesystem::path filename);
+        static SyntaxError unexpectedToken(const lexer::Token &token, parsing::ParserState state, lexer::TokenType expected, std::filesystem::path filename);
 
-        static SyntaxError invalidToken(const lexer::Token &token, const std::string &why);
-
-        const char * what() const noexcept override {
-            return formatted.c_str();
-        }
-    };
-
-    class InvalidAST final: public std::exception {
-        std::string formatted;
-    public:
-        const FilePosition position;
-        explicit InvalidAST(const FilePosition pos) : position(pos) {
-            formatted = "encountered invalid AST at " + position.to_string() + " (this is probably a parser bug)";
-        }
+        static SyntaxError invalidToken(const lexer::Token &token, const std::string &why, std::filesystem::path filename);
 
         const char * what() const noexcept override {
             return formatted.c_str();

@@ -1,6 +1,7 @@
 #include "lexer.h"
 
 #include <iostream>
+#include <utility>
 #include "exceptions.h"
 
 using namespace lexer;
@@ -17,7 +18,10 @@ std::string TokenType::to_string() const {
         case KW_TRUE: return "true";
         case KW_FALSE: return "false";
         case KW_NULL: return "null";
+        case KW_TRY: return "try";
+        case KW_RECOVER: return "recover";
         case PUNC_SEMICOLON: return ";";
+        case PUNC_SCOPE: return "::";
         case PUNC_CALL: return "$";
         case PUNC_PLUS: return "+";
         case PUNC_MINUS: return "-";
@@ -60,7 +64,10 @@ std::string TokenType::to_string() const {
 
 std::string Token::span() const {
     if (!parent)
-        throw std::runtime_error("tried to convert a token with a nullptr parent to a string");
+        throw exceptions::SyntaxError(
+            "internal error: tried to convert a token with a nullptr parent to a string",
+            position, "???"
+        );
     return parent->substr(start, end - start);
 }
 
@@ -83,13 +90,13 @@ bool Lexer::chompString(const std::string &needle, Token & token) {
 void Lexer::skipWhitespace() {
     while (index <= dataLength) {
         // Get the current character, and check if it's whitespace
-        const char current = byteAt(index);
+        const char current = rawData[index];
         if (!isspace(current)) return;
         incrementPosition();
     }
 }
 
-Lexer::Lexer (std::string & data) : rawData(data), dataLength(data.size()) {
+Lexer::Lexer (std::string & data, std::filesystem::path  filename) : rawData(data), dataLength(data.size()), filename(std::move(filename)) {
     // Check that the file is actually ASCII
     for (char chr : data) {
         if (!isascii(chr)) {
@@ -108,7 +115,7 @@ Lexer::Lexer (std::string & data) : rawData(data), dataLength(data.size()) {
 
 void Lexer::incrementPosition() {
     index++;
-    if (byteAt(index) == '\n') {
+    if (rawData[index] == '\n') {
         position.line++;
         position.column = 0;
     }
@@ -144,9 +151,12 @@ bool Lexer::advanceToken(Token & token) {
     IF_CHOMP_RETURN("true", TokenType::KW_TRUE);
     IF_CHOMP_RETURN("false", TokenType::KW_FALSE);
     IF_CHOMP_RETURN("null", TokenType::KW_NULL);
-    IF_CHOMP_RETURN("infinity", TokenType::KW_INFINITY);
-    IF_CHOMP_RETURN("-infinity", TokenType::KW_NEG_INFINITY);
+    IF_CHOMP_RETURN("inf", TokenType::KW_INFINITY);
+    IF_CHOMP_RETURN("-inf", TokenType::KW_NEG_INFINITY);
     IF_CHOMP_RETURN("nan", TokenType::KW_NAN);
+    IF_CHOMP_RETURN("try", TokenType::KW_TRY);
+    IF_CHOMP_RETURN("recover", TokenType::KW_RECOVER);
+    IF_CHOMP_RETURN("use", TokenType::KW_USE);
 
     // Match comments before we match punctuation
     if ( chompString("/*", token) ) {
@@ -155,7 +165,7 @@ bool Lexer::advanceToken(Token & token) {
         auto start = token.start;
         while ( !chompString("*/", token) ) {
             if ( index + 2 >= dataLength ) {
-                throw exceptions::SyntaxError::unexpectedEOF(token.getPosition());
+                throw exceptions::SyntaxError::unexpectedEOF(token.getPosition(), filename);
             }
             incrementPosition();
         }
@@ -167,8 +177,9 @@ bool Lexer::advanceToken(Token & token) {
     // Punctuation
     IF_CHOMP_RETURN(";", TokenType::PUNC_SEMICOLON);
     IF_CHOMP_RETURN(":=", TokenType::PUNC_DECLARATION);
-    IF_CHOMP_RETURN("+", TokenType::PUNC_PLUS);
+    IF_CHOMP_RETURN("::", TokenType::PUNC_SCOPE);
     IF_CHOMP_RETURN("$", TokenType::PUNC_CALL);
+    IF_CHOMP_RETURN("+", TokenType::PUNC_PLUS);
     IF_CHOMP_RETURN("*", TokenType::PUNC_MULT);
     IF_CHOMP_RETURN("/", TokenType::PUNC_DIV);
     IF_CHOMP_RETURN("%", TokenType::PUNC_MOD);
@@ -198,7 +209,7 @@ bool Lexer::advanceToken(Token & token) {
     if ( chompString("0x", token) ) {
         token.type = TokenType::LIT_HEX_NUMBER;
 
-        while ( !atEnd() && isxdigit(byteAt(index)))
+        while ( !atEnd() && isxdigit(rawData[index]))
             incrementPosition();
         token.end = index;
         return true;
@@ -208,7 +219,7 @@ bool Lexer::advanceToken(Token & token) {
     if ( chompString("0b", token) ) {
         token.type = TokenType::LIT_BIN_NUMBER;
 
-        while ( !atEnd() && (byteAt(index) == '0' || byteAt(index) == '1'))
+        while ( !atEnd() && (rawData[index] == '0' || rawData[index] == '1'))
             incrementPosition();
         token.end = index;
         return true;
@@ -218,26 +229,26 @@ bool Lexer::advanceToken(Token & token) {
     if ( chompString("0o", token) ) {
         token.type = TokenType::LIT_OCT_NUMBER;
 
-        while ( !atEnd() && byteAt(index) >= '0' && byteAt(index) <= '7')
+        while ( !atEnd() && rawData[index] >= '0' && rawData[index] <= '7')
             incrementPosition();
         token.end = index;
         return true;
     }
 
-    auto currentByte = byteAt(index);
+    auto currentByte = rawData[index];
 
     // Match against a decimal number (optionally, with a point)
     if ( isdigit(currentByte) || (
         index + 1 < dataLength &&
         currentByte == '-' &&
-        isdigit(byteAt(index + 1))
+        isdigit(rawData[index + 1])
     ) ) {
         if (currentByte == '-') index++;
         token.type = TokenType::LIT_DEC_NUMBER;
         bool foundDecimalPoint = false;
 
-        while (isdigit(byteAt(index)) || (!foundDecimalPoint && byteAt(index) == '.')) {
-            foundDecimalPoint |= byteAt(index) == '.';
+        while (isdigit(rawData[index]) || (!foundDecimalPoint && rawData[index] == '.')) {
+            foundDecimalPoint |= rawData[index] == '.';
             incrementPosition(); token.end++;
             if (atEnd()) return true;
         }
@@ -251,11 +262,11 @@ bool Lexer::advanceToken(Token & token) {
         token.type = TokenType::LIT_STRING;
         bool lastWasEscape = false;
         incrementPosition(); // Advance past the starting quote
-        if (atEnd()) throw exceptions::SyntaxError::unexpectedEOF(token.getPosition());
-        while ( lastWasEscape || byteAt(index) != '\"' ) {
-            lastWasEscape = byteAt(index) == '\\';
+        if (atEnd()) throw exceptions::SyntaxError::unexpectedEOF(token.getPosition(), filename);
+        while ( lastWasEscape || rawData[index] != '\"' ) {
+            lastWasEscape = rawData[index] == '\\';
             incrementPosition(); // Advance past the inner character
-            if (atEnd()) throw exceptions::SyntaxError::unexpectedEOF(token.getPosition());
+            if (atEnd()) throw exceptions::SyntaxError::unexpectedEOF(token.getPosition(), filename);
         }
         incrementPosition(); // Advance past the ending quote
         token.end = index;
@@ -266,7 +277,7 @@ bool Lexer::advanceToken(Token & token) {
     if ( isalpha(currentByte) || currentByte == '_' ) {
         token.type = TokenType::IDENTIFIER;
         while ( !atEnd() ) {
-            auto const thisByte = byteAt(index);
+            auto const thisByte = rawData[index];
             if ( !(isalnum(thisByte) || thisByte == '_') )
                 break;
             incrementPosition();
@@ -276,6 +287,6 @@ bool Lexer::advanceToken(Token & token) {
     }
 
     throw exceptions::SyntaxError(
-        "unrecognized token", token.getPosition()
+        "unrecognized token", token.getPosition(), filename
     );
 }

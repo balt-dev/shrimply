@@ -1,6 +1,7 @@
 #include "parsing.h"
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 
 #include "lexer.h"
@@ -10,31 +11,46 @@ using lexer::TokenType;
 
 #define SWAP_AND_BREAK(state) stateStack.back() = ParserState::state; break;
 #define EXPECT_TYPE(expectedType) if (type != TokenType::expectedType) { \
-    throw exceptions::SyntaxError::unexpectedToken(token, stateStack.back(), TokenType(TokenType::expectedType)); \
+    throw exceptions::SyntaxError::unexpectedToken(token, stateStack.back(), TokenType(TokenType::expectedType), filename); \
 }
-#define THROW_UNEXPECTED throw exceptions::SyntaxError::unexpectedToken(token, stateStack.back());
-#define THROW_INVALID(why) throw exceptions::SyntaxError::invalidToken(token, why);
+#define THROW_UNEXPECTED throw exceptions::SyntaxError::unexpectedToken(token, stateStack.back(), filename);
+#define THROW_INVALID(why) throw exceptions::SyntaxError::invalidToken(token, why, filename);
 #define EXPECT_SWAP_BREAK(expected, state) EXPECT_TYPE(expected); SWAP_AND_BREAK(state);
 #define TRY_DOWNCAST_HEAD(name, type) std::shared_ptr<type> name; { \
     auto ptr = treeCursor.back(); \
     auto val = std::dynamic_pointer_cast<type>(ptr); \
-    if (!val) throw std::runtime_error("internal parser error: failed to downcast to " #type " at " + token.getPosition().to_string() + " (was actually " + ptr->to_string() + ", in state " + std::to_string((int) stateStack.back()) + ")"); \
+    if (!val) \
+        throwFailedDowncast(stateStack, treeCursor, #type, ptr->position, filename); \
     name = val; \
+}
+
+void throwFailedDowncast(const std::vector<ParserState> & stateStack, const std::vector<std::shared_ptr<Atom>> & treeCursor, const char* typeName, exceptions::FilePosition pos, std::filesystem::path filename) {
+    std::ostringstream ss;
+    ss << "internal error: failed to downcast to " << typeName << " (tree: ";
+    for (const auto& atom : treeCursor) {
+        ss << atom->to_string() << " | ";
+    }
+    ss << ", stack: ";
+    for (auto state : stateStack) {
+        ss << (int) state << " ";
+    }
+    ss << ")";
+    throw exceptions::SyntaxError(ss.str(), pos, filename);
 }
 
 class ArgList final: public Atom {
 public:
     std::vector<std::string> arguments;
 
-    std::string to_string() override {
-        std::stringstream ss ("(arglist) ");
+    std::string to_string() const override {
+        std::stringstream ss;
         for (const auto& arg : arguments)
             ss << arg << ", ";
         return ss.str();
     }
 };
 
-std::string unescapeString(const lexer::Token &token) {
+std::string unescapeString(const lexer::Token &token, const std::filesystem::path& filename) {
     auto escaped_buf = token.span();
     escaped_buf = escaped_buf.substr(1, escaped_buf.size() - 2); // Trim quotes from both sides
 
@@ -86,7 +102,7 @@ std::string unescapeString(const lexer::Token &token) {
 
 Root Parser::getSyntaxTree() {
     if (stateStack.size() != 1)
-        throw exceptions::SyntaxError::unexpectedEOF(lastToken.getPosition());
+        throw exceptions::SyntaxError::unexpectedEOF(lastToken.getPosition(), filename);
     stateStack.pop_back();
     Root value = std::move(*syntaxTree);
     syntaxTree.reset();
@@ -101,12 +117,26 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
     if (type == TokenType::COMMENT) return; // Ignore comments
 
     auto head = treeCursor.back();
+    head->position = token.getPosition();
 
     switch (stateStack.back()) {
         // Note: I've used blocks around the cases to make them distinct variable scopes.
         case ParserState::ROOT: {
             TRY_DOWNCAST_HEAD(root, Root);
             switch (type) {
+                case TokenType::KW_USE: {
+                    std::shared_ptr<Item> ptr = std::make_shared<Use>();
+                    ptr->position = token.getPosition();
+                    root->items.push_back(ptr);
+                    treeCursor.push_back(ptr);
+                    stateStack.push_back(ParserState::STATEMENT_SEMICOLON);
+                    stateStack.push_back(ParserState::USE_PATH);
+                    std::shared_ptr<Path> path = std::make_shared<Path>();
+                    path->position = token.getPosition();
+                    treeCursor.push_back(path);
+                    stateStack.push_back(ParserState::PATH_IDENT);
+                    break;
+                }
                 case TokenType::PUNC_DECLARATION: {
                     stateStack.push_back(ParserState::GLOBAL_DECLARATION);
                     stateStack.push_back(ParserState::STATEMENT_SEMICOLON);
@@ -127,6 +157,33 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 case TokenType::END_OF_FILE: return;
                 default: THROW_UNEXPECTED;
             } break;
+        }
+        case ParserState::PATH_IDENT: {
+            EXPECT_TYPE(IDENTIFIER);
+            TRY_DOWNCAST_HEAD(path, Path);
+            path->position = token.getPosition();
+            path->members.push_back(token.span());
+            SWAP_AND_BREAK(PATH_SCOPE_OR_END);
+        }
+        case ParserState::PATH_SCOPE_OR_END: {
+            switch (type) {
+                case TokenType::PUNC_SCOPE: SWAP_AND_BREAK(PATH_IDENT);
+                default: {
+                    // At the end of the path, bubble it up and reinterpret
+                    stateStack.pop_back();
+                    goto reinterpret;
+                }
+            }
+            break;
+        }
+        case ParserState::USE_PATH: {
+            TRY_DOWNCAST_HEAD(path, Path);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(use, Use);
+            use->module = *path;
+            treeCursor.pop_back();
+            stateStack.pop_back();
+            goto reinterpret;
         }
         case ParserState::FUNCTION_IDENT: {
             EXPECT_TYPE(IDENTIFIER);
@@ -273,6 +330,14 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                     stateStack.push_back(ParserState::EXPRESSION);
                     break;
                 }
+                case TokenType::KW_TRY: {
+                    std::shared_ptr<Statement> tryrecv = std::make_shared<TryRecover>();
+                    treeCursor.push_back(tryrecv);
+                    tryrecv->position = token.getPosition();
+                    stateStack.back() = ParserState::TRY_STATEMENT;
+                    stateStack.push_back(ParserState::STATEMENT);
+                    break;
+                }
                 case TokenType::KW_LOOP: {
                     auto loopRaw = std::make_shared<Loop>();
                     std::shared_ptr<Statement> loop = loopRaw;
@@ -361,10 +426,14 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 }
                 // Call
                 case TokenType::PUNC_CALL: { //
-                    stateStack.back() = ParserState::CALL_IDENT;
+                    stateStack.back() = ParserState::CALL_PATH;
                     auto call = std::make_shared<Call>();
                     call->position = token.getPosition();
                     treeCursor.push_back(call);
+                    auto path = std::make_shared<Path>();
+                    path->position = token.getPosition();
+                    treeCursor.push_back(path);
+                    stateStack.push_back(ParserState::PATH_IDENT);
                     break;
                 }
                 // Unary operator(s)
@@ -378,11 +447,11 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 }
                 // Identifiers
                 case TokenType::IDENTIFIER: {
-                    auto ident = std::make_shared<Identifier>(token.span());
-                    ident->position = token.getPosition();
-                    treeCursor.push_back(ident);
-                    stateStack.pop_back();
-                    break;
+                    stateStack.back() = ParserState::PATH_IDENT;
+                    std::shared_ptr<Atom> path = std::make_shared<Path>();
+                    path->position = token.getPosition();
+                    treeCursor.push_back(path);
+                    goto reinterpret;
                 }
                 // Literals
                 case TokenType::KW_NULL: {
@@ -407,14 +476,14 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                     break;
                 }
                 case TokenType::KW_NEG_INFINITY: {
-                    auto literal = std::make_shared<Literal>(value::Value(1.0 / 0.0));
+                    auto literal = std::make_shared<Literal>(value::Value(-1.0 / 0.0));
                     literal->position = token.getPosition();
                     treeCursor.push_back(literal);
                     stateStack.pop_back();
                     break;
                 }
                 case TokenType::KW_INFINITY: {
-                    auto literal = std::make_shared<Literal>(value::Value(-1.0 / 0.0));
+                    auto literal = std::make_shared<Literal>(value::Value(1.0 / 0.0));
                     literal->position = token.getPosition();
                     treeCursor.push_back(literal);
                     stateStack.pop_back();
@@ -479,7 +548,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 }
                 case TokenType::LIT_STRING: {
                     stateStack.pop_back();
-                    auto unescaped = unescapeString(token);
+                    auto unescaped = unescapeString(token, filename);
                     treeCursor.push_back(std::make_shared<Literal>(value::Value(unescaped)));
                     treeCursor.back()->position = token.getPosition();
                     break;
@@ -545,12 +614,13 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
             stateStack.pop_back();
             goto reinterpret;
         }
-        case ParserState::CALL_IDENT: {
-            EXPECT_TYPE(IDENTIFIER);
+        case ParserState::CALL_PATH: {
+            TRY_DOWNCAST_HEAD(path, Path);
+            treeCursor.pop_back();
             TRY_DOWNCAST_HEAD(call, Call);
-            call->functionName = token.span();
+            call->functionPath = *path;
             stateStack.back() = ParserState::CALL_L_PAREN;
-            break;
+            goto reinterpret;
         }
         case ParserState::CALL_L_PAREN:
             EXPECT_SWAP_BREAK(PUNC_L_PAREN, CALL_ARGS_NEXT);
@@ -649,7 +719,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
         case ParserState::MAP_KEY_STRING: {
             TRY_DOWNCAST_HEAD(map, Map);
             EXPECT_TYPE(LIT_STRING);
-            auto key = unescapeString(token);
+            auto key = unescapeString(token, filename);
             map->nextKey = key;
             stateStack.back() = ParserState::MAP_EQ;
             break;
@@ -674,6 +744,43 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 goto reinterpret;
             }
             EXPECT_SWAP_BREAK(PUNC_COMMA, MAP_KEY);
+        }
+        case ParserState::TRY_STATEMENT: {
+            TRY_DOWNCAST_HEAD(stmt, Statement);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tryrecv, TryRecover);
+            tryrecv->happyPath = stmt;
+            stateStack.back() = ParserState::TRY_MAYBE_RECV;
+            goto reinterpret;
+        }
+        case ParserState::TRY_MAYBE_RECV: {
+            if (token.type != TokenType::KW_RECOVER) {
+                stateStack.pop_back();
+                goto reinterpret;
+            }
+            stateStack.back() = ParserState::RECV_PATH;
+            std::shared_ptr<Path> path = std::make_shared<Path>();
+            path->position = token.getPosition();
+            treeCursor.push_back(path);
+            stateStack.push_back(ParserState::PATH_IDENT);
+            break;
+        }
+        case ParserState::RECV_PATH: {
+            TRY_DOWNCAST_HEAD(path, Path);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tryrecv, TryRecover);
+            tryrecv->binding = *path;
+            stateStack.back() = ParserState::RECV_STATEMENT;
+            stateStack.push_back(ParserState::STATEMENT);
+            break;
+        }
+        case ParserState::RECV_STATEMENT: {
+            TRY_DOWNCAST_HEAD(stmt, Statement);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tryrecv, TryRecover);
+            tryrecv->sadPath = stmt;
+            stateStack.pop_back();
+            break;
         }
     }
 }

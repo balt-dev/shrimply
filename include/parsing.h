@@ -17,7 +17,7 @@ namespace parsing {
         ROOT, DECLARATION_IDENT, FUNCTION_IDENT, FUNCTION_OPEN_PAREN, ARGLIST_NEXT, BLOCK, ARGLIST_COMMA,
         STATEMENT, BLOCK_START, DECLARATION_ASSIGN_OR_END,
         EXPRESSION, STATEMENT_SEMICOLON, RETURN_EXPRESSION_OR_END, IF_PREDICATE,
-        BINARY_LHS, BINARY_RHS, CALL_IDENT, UNARY_VALUE, RETURN_END, LIST_NEXT, MAP_KEY,
+        BINARY_LHS, BINARY_RHS, CALL_PATH, UNARY_VALUE, RETURN_END, LIST_NEXT, MAP_KEY,
         CALL_ARGS_NEXT, CALL_L_PAREN, CALL_ARG_EXPR, CALL_ARGS_COMMA,
         IF_TRUE, IF_FALSE, IF_ELSE,
         LIST_COMMA, LIST_EXPR,
@@ -26,12 +26,19 @@ namespace parsing {
         DECLARATION_END,
         BLOCK_STATEMENT, GLOBAL_DECLARATION,
         FUNCTION_STATEMENT, LOOP_STATEMENT,
+        PATH_IDENT,
+        PATH_SCOPE_OR_END,
+        USE_PATH,
+        TRY_STATEMENT,
+        TRY_MAYBE_RECV,
+        RECV_STATEMENT,
+        RECV_PATH,
     };
 
     class Atom {
     public:
         exceptions::FilePosition position;
-        virtual std::string to_string() {
+        virtual std::string to_string() const {
             return "???";
         }
         virtual ~Atom() = default;
@@ -42,7 +49,7 @@ namespace parsing {
     class Root final: public Atom {
     public:
         std::vector<std::shared_ptr<Item>> items {};
-        std::string to_string() override {
+        std::string to_string() const override {
             std::stringstream str;
             for (const auto& item : items) {
                 str << item->to_string() << "; ";
@@ -57,7 +64,7 @@ namespace parsing {
     public:
         std::vector<std::shared_ptr<Statement>> statements {};
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::stringstream ss;
             ss << "{";
             for (const auto& stmt : statements)
@@ -74,14 +81,44 @@ namespace parsing {
         }
         /// Evaluates the rvalue and returns a result.
         virtual value::Value result(runtime::Stackframe & frame) {
-            throw std::runtime_error("internal runtime error: cannot evaluate expression: " + to_string());
+            throw exceptions::RuntimeError(frame, "internal error: cannot evaluate expression: " + to_string());
         }
     };
+    /// An identifier path.
+    struct Path final: Expression {
+        std::vector<std::string> members;
+
+        std::string to_string() const override {
+            if (members.empty()) return "<empty path>";
+
+            std::stringstream ss;
+
+            for (int i = 0; i < members.size(); i++) {
+                if (i) ss << "::";
+                ss << members[i];
+            }
+            return ss.str();
+        }
+
+        value::Value *pointer(runtime::Stackframe &frame) override;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        explicit Path(std::vector<std::string> path = {}) : members(std::move(path)) {}
+    };
+    /// Importing a module.
+    struct Use: Item {
+        Path module;
+
+        std::string to_string() const override {
+            return "use " + module.to_string() + ";";
+        };
+    };
+    /// An expression as a statement.
     class ExpressionStatement: public Statement {
     public:
         std::shared_ptr<Expression> expr;
 
-        std::string to_string() override { return (expr ? expr->to_string() : "<nullptr>") + ";"; }
+        std::string to_string() const override { return (expr ? expr->to_string() : "<nullptr>") + ";"; }
     };
     /// A literal value.
     class Literal final: public Expression {
@@ -92,7 +129,7 @@ namespace parsing {
         };
         Literal() = default;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             return value.raw_string();
         }
 
@@ -109,7 +146,7 @@ namespace parsing {
         value::Value result(runtime::Stackframe & frame) override;
 
         explicit BinaryOp(lexer::TokenType _opr): opr(_opr) {}
-        std::string to_string() override {
+        std::string to_string() const override {
             return opr.to_string() + " " + lhs->to_string() + " " + rhs->to_string();
         }
     };
@@ -123,20 +160,20 @@ namespace parsing {
 
         explicit UnaryOp(lexer::TokenType _opr): opr(_opr) {}
 
-        std::string to_string() override {
+        std::string to_string() const override {
             return opr.to_string() + " " + value->to_string();
         }
     };
     /// A function call.
     class Call final: public Expression {
     public:
-        std::string functionName;
+        Path functionPath;
         std::vector<std::shared_ptr<Expression>> arguments {};
         value::Value result(runtime::Stackframe & frame) override;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::ostringstream ss;
-            ss << "$ " << functionName << " (";
+            ss << "$ " << functionPath.to_string() << " (";
             for (const auto& arg : arguments) {
                 ss << arg->to_string() << ", ";
             }
@@ -144,29 +181,15 @@ namespace parsing {
             return ss.str();
         }
     };
-    /// An identifier.
-    class Identifier final: public Expression {
-    public:
-        std::string name;
-
-        value::Value *pointer(runtime::Stackframe &frame) override;
-        value::Value result(runtime::Stackframe & frame) override;
-
-        std::string to_string() override {
-            return name;
-        }
-
-        explicit Identifier(std::string str = "") : name(std::move(str)) {}
-    };
     /// Breaking out of a loop.
     class Break final: public Statement {
-        std::string to_string() override {
+        std::string to_string() const override {
             return "break";
         }
     };
     /// Continuing to the next iteration of a loop.
     class Continue final: public Statement {
-        std::string to_string() override {
+        std::string to_string() const override {
             return "continue";
         }
     };
@@ -178,7 +201,7 @@ namespace parsing {
             value = std::make_shared<Literal>();
         }
 
-        std::string to_string() override {
+        std::string to_string() const override {
             return "return " + value->to_string();
         }
     };
@@ -191,7 +214,7 @@ namespace parsing {
             value = std::make_shared<Literal>();
         }
 
-        std::string to_string() override {
+        std::string to_string() const override {
             return ":= " + name + " " + value->to_string();
         }
     };
@@ -202,7 +225,7 @@ namespace parsing {
         std::vector<std::string> arguments {};
         std::shared_ptr<Statement> body;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::ostringstream ss;
             ss << "fn " + name + "(";
             for (const auto& arg : arguments) {
@@ -219,7 +242,7 @@ namespace parsing {
         std::shared_ptr<Statement> truePath;
         std::shared_ptr<Statement> falsePath;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::ostringstream ss;
             ss << "if " + predicate->to_string() << " "
                 << (truePath ? truePath->to_string() : "<nullptr>")
@@ -227,11 +250,27 @@ namespace parsing {
             return ss.str();
         }
     };
+    /// Error handling.
+    class TryRecover final: public Statement {
+    public:
+        std::shared_ptr<Statement> happyPath;
+        Path binding;
+        std::shared_ptr<Statement> sadPath;
+
+        std::string to_string() const override {
+            std::ostringstream ss;
+            ss << "try "
+                << (happyPath ? happyPath->to_string() : "<nullptr>")
+                << " recover " << binding.to_string() << " "
+                << (sadPath ? sadPath->to_string() : "<nullptr>");
+            return ss.str();
+        }
+    };
     /// Repeated code execution.
     class Loop final: public Statement {
     public:
         std::shared_ptr<Statement> body;
-        std::string to_string() override {
+        std::string to_string() const override {
             return "loop " + (body ? body->to_string() : "<nullptr>");
         }
     };
@@ -241,10 +280,10 @@ namespace parsing {
         std::vector<std::shared_ptr<Expression>> members;
         value::Value result(runtime::Stackframe & frame) override;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::ostringstream ss;
             ss << "[";
-            for (auto member : members) {
+            for (const auto &member : members) {
                 ss << member->to_string() << ", ";
             }
             ss << "]";
@@ -259,10 +298,10 @@ namespace parsing {
         std::unordered_map<std::string, std::shared_ptr<Expression>> pairs;
         value::Value result(runtime::Stackframe & frame) override;
 
-        std::string to_string() override {
+        std::string to_string() const override {
             std::ostringstream ss;
             ss << "(";
-            for (auto pair : pairs) {
+            for (const auto& pair : pairs) {
                 ss << "\"" << pair.first << "\" = " << pair.second->to_string() << ", ";
             }
             ss << ")";
@@ -277,8 +316,9 @@ namespace parsing {
         std::vector<ParserState> stateStack { ParserState::ROOT };
         std::shared_ptr<Root> syntaxTree;
         std::vector<std::shared_ptr<Atom>> treeCursor;
+        std::filesystem::path filename;
 
-        Parser() {
+        Parser(std::filesystem::path filename) : filename(std::move(filename)) {
             const auto root = std::make_shared<Root>();
             syntaxTree = root;
             treeCursor.push_back(root);

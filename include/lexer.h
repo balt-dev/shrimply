@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <filesystem>
 
 #include "exceptions.h"
 
@@ -33,11 +34,15 @@ namespace lexer {
             KW_INFINITY, // infinity
             KW_NEG_INFINITY, // -infinity
             KW_NAN, // nan
+            KW_TRY, // try
+            KW_RECOVER, // recover
+            KW_USE, // use
 
             // --- Punctuation ---
             PUNC_SEMICOLON, // ;
             PUNC_DECLARATION, // :=
             PUNC_CALL, // $
+            PUNC_SCOPE, // ::
             PUNC_PLUS, // +
             PUNC_MINUS, // -
             PUNC_MULT, // *
@@ -134,13 +139,6 @@ namespace lexer {
         size_t index = 0;
         exceptions::FilePosition position { 1, 1 };
 
-        // fuck utf8 support i need o(1)
-        char byteAt(const size_t index) const {
-            const char* rawPointer = rawData.c_str();
-            return rawPointer[index];
-        }
-
-
         /// @brief Matches a string in the raw data, advancing if it is found.
         /// @param needle The string to match.
         /// @param token A token to write to. This is left untouched if the function returns false.
@@ -150,7 +148,8 @@ namespace lexer {
         void incrementPosition();
 
     public:
-        explicit Lexer(std::string &data);
+        std::filesystem::path filename;
+        Lexer(std::string &data, std::filesystem::path filename);
 
         /// @brief Skips over whitespace in the data string.
         void skipWhitespace();

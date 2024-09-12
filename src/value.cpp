@@ -12,7 +12,7 @@ std::string Value::raw_string(std::unordered_set<unsigned long long> seenIds) co
         case ValueType::String: return "\"" + string + "\"";
         case ValueType::Boolean: return boolean ? "true" : "false";
         case ValueType::Integer: return std::to_string(integer);
-        case ValueType::Double: return std::to_string(number);
+        case ValueType::Number: return std::to_string(number);
         case ValueType::List: {
             seenIds.insert(id);
             std::stringstream stream;
@@ -39,8 +39,12 @@ std::string Value::raw_string(std::unordered_set<unsigned long long> seenIds) co
             stream << ")";
             return stream.str();
         }
+        case ValueType::Extern: {
+            std::stringstream stream;
+            stream << "<extern " << external << ">";
+        }
         default:
             // We've already hit UB, so we raise
-            throw std::runtime_error("internal runtime error: value tag is malformed: " + std::to_string((int) tag));
+            throw std::runtime_error("internal error: value tag is malformed: " + std::to_string((int) tag));
     }
 }

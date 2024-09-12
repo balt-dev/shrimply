@@ -1,0 +1,7 @@
+
+:= x 5;
+
+
+fn amongus(x) {
+    return + x 3;
+}
