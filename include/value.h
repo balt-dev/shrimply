@@ -62,7 +62,7 @@ namespace value {
             }
         }
 
-        Value(): boolean{false}, id(counter++) {}
+        Value(): boolean{false}, id(counter++), tag(ValueType::Null) {}
 
         ~Value() {
             if (tag == ValueType::String) string.~basic_string();

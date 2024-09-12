@@ -1,8 +1,8 @@
 /*
-    .spl is pronounced spill, standing for "simple programming language"
+    .spl, short for "shrimple programming language", is pronounced "spill"
 
     - Functions are not first class, can't pass them around
-    - Variable types are null, boolean, number (double), string, list, and map
+    - Variable types are null, boolean, number (double), string, list, map, and extern
         - Strings are a const std::string
         - Lists are a std::shared_ptr<std::vector<Value>>
         - Maps are a std::shared_ptr<std::map<std::string, Value>>
@@ -39,20 +39,30 @@ use import::wawa;
 fn identity(x) { return x; }
 
 fn goober() {
+    /* x isn't in scope here, this should error */
     $std::print(x);
 }
 
-fn recursive(i) {
+fn estimate_recursion_depth_limit(i) {
+    if == i null = i 0;
     try {
-        $recursive(+ i 1);
+        $estimate_recursion_depth_limit(+ i 1);
     } recover err {
-        $std::print(i);
+        $std::print(+ "recursion depth limit: " i);
     }
 }
 
 fn main(args) {
     := map ("3" = 1, "4" = 5);
-    $std::print(inf);
+    $estimate_recursion_depth_limit();
+
+    try {
+        $std::crash("uh oh");
+    } recover err {
+        $std::print(err);
+    }
+
+
 }
 
 /*

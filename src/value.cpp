@@ -42,9 +42,9 @@ std::string Value::raw_string(std::unordered_set<unsigned long long> seenIds) co
         case ValueType::Extern: {
             std::stringstream stream;
             stream << "<extern " << external << ">";
+            return stream.str();
         }
         default:
-            // We've already hit UB, so we raise
-            throw std::runtime_error("internal error: value tag is malformed: " + std::to_string((int) tag));
+            throw std::runtime_error("internal runtime error: malformed value");
     }
 }

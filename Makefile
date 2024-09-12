@@ -1,6 +1,6 @@
 CC=g++
 
-TARGET=simply
+TARGET=shrimply
 
 SRCDIR=./src
 INCLUDEDIR=./include
@@ -13,7 +13,7 @@ OBJECTS=$(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SRCS))
 HEADS=$(wildcard $(INCLUDEDIR)/*.h)
 
 LDFLAGS=-g
-CPPFLAGS=-g -Wall -I$(INCLUDEDIR)
+CPPFLAGS=-g -I$(INCLUDEDIR)
 
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $^

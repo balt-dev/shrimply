@@ -8,7 +8,7 @@
 
 int main( int argc, char * argv[]) {
     if (argc <= 1) {
-        std::cerr << "Usage: simply.exe <filename> [args...]" << std::endl;
+        std::cerr << "Usage: shrimply.exe <filename> [args...]" << std::endl;
         return 0;
     }
 
