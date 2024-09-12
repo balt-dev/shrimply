@@ -50,6 +50,7 @@ namespace lexer {
             PUNC_MOD, // %
             PUNC_INDEX, // .
             PUNC_COMMA, // ,
+            PUNC_TERNARY, // ?
             PUNC_AND, // &&
             PUNC_OR, // ||
             PUNC_DOUBLE_EQ, // ==
@@ -60,6 +61,8 @@ namespace lexer {
             PUNC_AMPERSAND, // &
             PUNC_BITOR, // |
             PUNC_XOR, // ^
+            PUNC_SHL, // <<
+            PUNC_SHR, // >>
             PUNC_NOT, // !
             PUNC_L_PAREN, // (
             PUNC_R_PAREN, // )

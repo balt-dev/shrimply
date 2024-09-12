@@ -33,6 +33,9 @@ namespace parsing {
         TRY_MAYBE_RECV,
         RECV_STATEMENT,
         RECV_PATH,
+        TERNARY_PREDICATE,
+        TERNARY_LHS,
+        TERNARY_RHS,
     };
 
     class Atom {
@@ -46,8 +49,7 @@ namespace parsing {
     /// A top-level item in the file, like a global variable or a function.
     class Item: public Atom {};
     // The entire file.
-    class Root final: public Atom {
-    public:
+    struct Root final: Atom {
         std::vector<std::shared_ptr<Item>> items {};
         std::string to_string() const override {
             std::stringstream str;
@@ -60,8 +62,7 @@ namespace parsing {
     /// A statement, like a variable declaration or return.
     class Statement: public Atom {};
     /// A syntactic block of statements.
-    class Block final: public Statement {
-    public:
+    struct Block final: Statement {
         std::vector<std::shared_ptr<Statement>> statements {};
 
         std::string to_string() const override {
@@ -73,8 +74,7 @@ namespace parsing {
             return ss.str();
         }
     };
-    class Expression: public Atom {
-    public:
+    struct Expression: Atom {
         /// Assigns a value to the place this expression represents.
         virtual value::Value *pointer(runtime::Stackframe &frame) {
             throw exceptions::RuntimeError(frame, "expression does not support assignment: " + to_string());
@@ -114,15 +114,13 @@ namespace parsing {
         };
     };
     /// An expression as a statement.
-    class ExpressionStatement: public Statement {
-    public:
+    struct ExpressionStatement final: Statement {
         std::shared_ptr<Expression> expr;
 
         std::string to_string() const override { return (expr ? expr->to_string() : "<nullptr>") + ";"; }
     };
     /// A literal value.
-    class Literal final: public Expression {
-    public:
+    struct Literal final: Expression {
         value::Value value;
         value::Value result(runtime::Stackframe & frame) override {
             return value;
@@ -136,8 +134,7 @@ namespace parsing {
         explicit Literal(const value::Value &v) : value(v) {};
     };
     /// A binary expression.
-    class BinaryOp final: public Expression {
-    public:
+    struct BinaryOp final: Expression {
         lexer::TokenType opr;
         std::shared_ptr<Expression> lhs = std::make_shared<Literal>();
         std::shared_ptr<Expression> rhs = std::make_shared<Literal>();
@@ -151,8 +148,7 @@ namespace parsing {
         }
     };
     /// A unary expression.
-    class UnaryOp final: public Expression {
-    public:
+    struct UnaryOp final: Expression {
         lexer::TokenType opr;
         std::shared_ptr<Expression> value = std::make_shared<Literal>();
 
@@ -164,9 +160,21 @@ namespace parsing {
             return opr.to_string() + " " + value->to_string();
         }
     };
+    /// A ternary expression.
+    struct Ternary final: Expression {
+        std::shared_ptr<Expression> predicate = std::make_shared<Literal>();
+        std::shared_ptr<Expression> lhs = std::make_shared<Literal>();
+        std::shared_ptr<Expression> rhs = std::make_shared<Literal>();
+
+        value::Value *pointer(runtime::Stackframe &frame) override;
+        value::Value result(runtime::Stackframe & frame) override;
+
+        std::string to_string() const override {
+            return "? " + predicate->to_string() + " " + lhs->to_string() + " " + rhs->to_string();
+        }
+    };
     /// A function call.
-    class Call final: public Expression {
-    public:
+    struct Call final: Expression {
         Path functionPath;
         std::vector<std::shared_ptr<Expression>> arguments {};
         value::Value result(runtime::Stackframe & frame) override;
@@ -194,8 +202,7 @@ namespace parsing {
         }
     };
     /// Returning a value from a function.
-    class Return final: public Statement {
-    public:
+    struct Return final: Statement {
         std::shared_ptr<Expression> value = std::make_shared<Literal>();
         Return() {
             value = std::make_shared<Literal>();
@@ -219,8 +226,7 @@ namespace parsing {
         }
     };
     /// A top level declaration of a function.
-    class Function final: public Item {
-    public:
+    struct Function final: Item {
         std::string name;
         std::vector<std::string> arguments {};
         std::shared_ptr<Statement> body;
@@ -236,8 +242,7 @@ namespace parsing {
         }
     };
     /// Alternation based on a predicate.
-    class IfElse final: public Statement {
-    public:
+    struct IfElse final: Statement {
         std::shared_ptr<Expression> predicate = std::make_shared<Literal>();
         std::shared_ptr<Statement> truePath;
         std::shared_ptr<Statement> falsePath;
@@ -251,8 +256,7 @@ namespace parsing {
         }
     };
     /// Error handling.
-    class TryRecover final: public Statement {
-    public:
+    struct TryRecover final: Statement {
         std::shared_ptr<Statement> happyPath;
         Path binding;
         std::shared_ptr<Statement> sadPath;
@@ -267,16 +271,14 @@ namespace parsing {
         }
     };
     /// Repeated code execution.
-    class Loop final: public Statement {
-    public:
+    struct Loop final: Statement {
         std::shared_ptr<Statement> body;
         std::string to_string() const override {
             return "loop " + (body ? body->to_string() : "<nullptr>");
         }
     };
 
-    class List final: public Expression {
-    public:
+    struct List final: Expression {
         std::vector<std::shared_ptr<Expression>> members;
         value::Value result(runtime::Stackframe & frame) override;
 

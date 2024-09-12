@@ -9,8 +9,8 @@
 #include "lexer.h"
 
 namespace parsing {
-    class UnaryOp;
-    class BinaryOp;
+    struct UnaryOp;
+    struct BinaryOp;
 }
 
 namespace value {

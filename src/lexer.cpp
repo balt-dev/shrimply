@@ -185,6 +185,7 @@ bool Lexer::advanceToken(Token & token) {
     IF_CHOMP_RETURN("%", TokenType::PUNC_MOD);
     IF_CHOMP_RETURN(".", TokenType::PUNC_INDEX);
     IF_CHOMP_RETURN(",", TokenType::PUNC_COMMA);
+    IF_CHOMP_RETURN("?", TokenType::PUNC_TERNARY);
     IF_CHOMP_RETURN("&&", TokenType::PUNC_AND);
     IF_CHOMP_RETURN("||", TokenType::PUNC_OR);
     IF_CHOMP_RETURN("==", TokenType::PUNC_DOUBLE_EQ);
@@ -196,6 +197,8 @@ bool Lexer::advanceToken(Token & token) {
     IF_CHOMP_RETURN("|", TokenType::PUNC_BITOR);
     IF_CHOMP_RETURN("^", TokenType::PUNC_XOR);
     IF_CHOMP_RETURN("!", TokenType::PUNC_NOT);
+    IF_CHOMP_RETURN("<<", TokenType::PUNC_SHL);
+    IF_CHOMP_RETURN(">>", TokenType::PUNC_SHR);
     IF_CHOMP_RETURN("[", TokenType::PUNC_L_BRACKET);
     IF_CHOMP_RETURN("]", TokenType::PUNC_R_BRACKET);
     IF_CHOMP_RETURN("{", TokenType::PUNC_L_BRACE);
@@ -245,15 +248,16 @@ bool Lexer::advanceToken(Token & token) {
         currentByte == '-' &&
         isdigit(rawData[index + 1])
     ) ) {
-        if (currentByte == '-') index++;
+        if (currentByte == '-') incrementPosition();
         token.type = TokenType::LIT_DEC_NUMBER;
         bool foundDecimalPoint = false;
 
         while (isdigit(rawData[index]) || (!foundDecimalPoint && rawData[index] == '.')) {
             foundDecimalPoint |= rawData[index] == '.';
-            incrementPosition(); token.end++;
-            if (atEnd()) return true;
+            incrementPosition();
+            if (atEnd()) break;
         }
+        token.end = index;
         return true;
     }
 

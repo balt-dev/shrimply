@@ -22,6 +22,23 @@ using exceptions::RuntimeError;
 using lexer::TokenType;
 using value::Value;
 
+Value parsing::Ternary::result(Stackframe &frame) {
+    frame.sourcePos = position;
+    auto pred = predicate->result(frame);
+    if (pred.asBoolean())
+        return lhs->result(frame);
+    return rhs->result(frame);
+}
+
+Value * parsing::Ternary::pointer(Stackframe &frame) {
+    frame.sourcePos = position;
+    auto pred = predicate->result(frame);
+    if (pred.asBoolean())
+        return lhs->pointer(frame);
+    return rhs->pointer(frame);
+}
+
+
 Value parsing::BinaryOp::result(Stackframe & frame) {
     frame.sourcePos = position;
     switch (opr.inner()) {
@@ -152,20 +169,23 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             auto right = rhs->result(frame); \
             long long x, y;  \
             if (!(left.asInteger(x) && right.asInteger(y))) throw RuntimeError(frame, \
-                "cannot apply binary " name " to values " + \
+                "cannot apply bitwise " name " to values " + \
                 left.to_string() + " and " + right.to_string()\
             ); \
             return Value(x opr y); \
         }
         BIT(PUNC_AMPERSAND, &, "and");
         BIT(PUNC_BITOR, |, "and");
+        BIT(PUNC_SHL, <<, "left shift");
+        BIT(PUNC_SHR, >>, "right shift");
         case TokenType::PUNC_XOR: {
             auto left = lhs->result(frame);
             frame.sourcePos = rhs->position;
             auto right = rhs->result(frame);
             if (left.tag == Value::ValueType::Boolean && right.tag == Value::ValueType::Boolean)
                 return Value(left.boolean != right.boolean);
-            if (left.tag == Value::ValueType::Integer && right.tag == Value::ValueType::Integer)
+            long long x, y;
+            if (left.asInteger(x) && right.asInteger(y))
                 return Value(left.integer ^ right.integer);
             throw RuntimeError(frame, "cannot apply binary xor to values " + left.raw_string() + " and " + right.raw_string() );
         }

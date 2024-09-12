@@ -398,6 +398,14 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
         }
         case ParserState::EXPRESSION: {
             switch (token.type.value) {
+                case TokenType::PUNC_TERNARY: { //
+                    stateStack.back() = ParserState::TERNARY_PREDICATE;
+                    stateStack.push_back(ParserState::EXPRESSION);
+                    auto tern = std::make_shared<Ternary>();
+                    tern->position = token.getPosition();
+                    treeCursor.push_back(tern);
+                    break;
+                }
                 // Binary operator(s)
                 case TokenType::PUNC_PLUS: //
                 case TokenType::PUNC_MINUS: //
@@ -415,6 +423,8 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                 case TokenType::PUNC_AMPERSAND: //
                 case TokenType::PUNC_BITOR: //
                 case TokenType::PUNC_XOR: //
+                case TokenType::PUNC_SHL: //
+                case TokenType::PUNC_SHR: //
                 case TokenType::PUNC_LT: //
                 case TokenType::PUNC_GT: { //
                     stateStack.back() = ParserState::BINARY_LHS;
@@ -511,6 +521,8 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                         break;
                     } catch (std::out_of_range& _) {
                         THROW_INVALID("number is out of range");
+                    } catch (std::invalid_argument& _) { \
+                        THROW_INVALID("could not convert to number: " + token.span()); \
                     }
                 }
 #define BASE_LITERAL(base, type) \
@@ -596,6 +608,32 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
             treeCursor.pop_back();
             TRY_DOWNCAST_HEAD(bin, BinaryOp);
             bin->rhs = expr;
+            stateStack.pop_back();
+            goto reinterpret;
+        }
+        case ParserState::TERNARY_PREDICATE: {
+            TRY_DOWNCAST_HEAD(expr, Expression);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tern, Ternary);
+            tern->predicate = expr;
+            stateStack.back() = ParserState::TERNARY_LHS;
+            stateStack.push_back(ParserState::EXPRESSION);
+            goto reinterpret;
+        }
+        case ParserState::TERNARY_LHS: {
+            TRY_DOWNCAST_HEAD(expr, Expression);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tern, Ternary);
+            tern->lhs = expr;
+            stateStack.back() = ParserState::TERNARY_RHS;
+            stateStack.push_back(ParserState::EXPRESSION);
+            goto reinterpret;
+        }
+        case ParserState::TERNARY_RHS: {
+            TRY_DOWNCAST_HEAD(expr, Expression);
+            treeCursor.pop_back();
+            TRY_DOWNCAST_HEAD(tern, Ternary);
+            tern->rhs = expr;
             stateStack.pop_back();
             goto reinterpret;
         }

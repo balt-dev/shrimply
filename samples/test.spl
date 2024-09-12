@@ -91,6 +91,19 @@ fn main(args) {
     = import::ago 7;
     $std::println(import::wawa::x);
 
+    $std::println(<< 1 4);
+    $std::println(>> -1 1);
+
+    $std::print(? true "cool " $std::crash());
+    $std::println(? false $std::crash() "good");
+
+    := foo 5;
+    := bar 7;
+
+    = ? false foo bar 3;
+
+    $std::println([foo, bar]);
+
     $std::println(. map "x");
 
     = .map "y" 5;

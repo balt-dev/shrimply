@@ -286,6 +286,46 @@ struct AsNumber final: AbstractFunction {
     }
 };
 
+struct Rand final: AbstractFunction {
+    Rand () {
+        srand(time(nullptr) * getpid());
+    }
+
+    Value call(Stackframe &frame, std::vector<Value> &args) override {
+        if (!args.empty()) {
+            if (args[0].tag == Value::ValueType::Null)
+                srand(time(nullptr) * getpid());
+            else {
+                long long seed;
+                EXPECT_TYPE(seed, args[0], asInteger, "integer");
+                srand(seed);
+            }
+        }
+        // Construct a double on [0, 1)
+        // I didn't want to figure out the C++ random library, so I did it like C.
+        uint64_t res = 0;
+        // Fill mantissa
+        res |= rand() & 0x7f;
+        res <<= 15;
+        res |= rand() & 0x7fff;
+        res <<= 15;
+        res |= rand() & 0x7fff;
+        res <<= 15;
+        res |= rand() & 0x7fff;
+        // Add exponent
+        res |= 0x3FFull << 52;
+
+        // Reinterpret
+        union {
+            uint64_t i = res;
+            double f;
+        };
+
+        // Subtract 1 and return
+        return Value ( f - 1 );
+    }
+};
+
 struct Parse final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> &args) override {
         EXPECT_ARGC(1);
@@ -316,6 +356,10 @@ std::shared_ptr<runtime::Module> initStdlib() {
     map->functions["keys"] = std::make_shared<Keys>();
     map->functions["values"] = std::make_shared<Values>();
     map->functions["contains"] = std::make_shared<Contains>();
+    auto string = std::make_shared<runtime::Module>(true);
+    std->imported["string"] = map;
+    string->functions["find"] = std::make_shared<Find>();
+    string->functions["substring"] = std::make_shared<Substring>();
     auto math = std::make_shared<runtime::Module>(true);
     std->imported["math"] = math;
     math->globals["pi"] = Value(M_PI);
@@ -333,6 +377,7 @@ std::shared_ptr<runtime::Module> initStdlib() {
     math->functions["floor"] = std::make_shared<Floor>();
     math->functions["as_int"] = std::make_shared<AsInteger>();
     math->functions["as_num"] = std::make_shared<AsNumber>();
+    math->functions["rand"] = std::make_shared<Rand>();
     math->functions["parse"] = std::make_shared<Parse>();
     return std;
 }
