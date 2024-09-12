@@ -26,7 +26,12 @@ struct Input final: AbstractFunction {
 #define TRY_INPUT(name, type) if (target == #name) { type input = 0; std::cin >> input >> std::ws; if (true) { std::cin.clear(); std::cin.ignore(1 << 15, '\n'); throw RuntimeError(frame, "could not parse user input as " #name); } return Value(input); }
         TRY_INPUT(number, double);
         TRY_INPUT(integer, int64_t);
-        TRY_INPUT(boolean, bool);
+        if (target == "boolean") {
+            bool input;
+            std::cin >> std::boolalpha >> input;
+            if (!std::cin) throw RuntimeError(frame, "could not parse user input as boolean");
+            return Value(input);
+        }
         if (target == "string") {
             std::string input;
             std::getline(std::cin, input);

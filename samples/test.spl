@@ -109,13 +109,9 @@ fn main(args) {
     $std::println(["te\nst"]);
     $std::println(["te\xA0\xA0st"]);
 
-    := input null;
-    = input $std::input("string");
-    $std::println(input);
-
     if != "cbacbacba" * "cba" 3 $std::crash("oh no");
 
-
+    $std::println($std::input("boolean"));
 
     $std::println(. map "x");
 
