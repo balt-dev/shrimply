@@ -35,7 +35,7 @@ namespace value {
         // Note: These were originally private, but I stopped caring.
         // Nobody else is working on this anyways.
         union {
-            long long integer;
+            int64_t integer;
             double number;
             bool boolean;
             std::string string;
@@ -95,7 +95,7 @@ namespace value {
             return false;
         }
 
-        explicit Value(const long long val): tag(ValueType::Integer), integer{val}, id(counter++) {}
+        explicit Value(const int64_t val): tag(ValueType::Integer), integer{val}, id(counter++) {}
         explicit Value(const double val): tag(ValueType::Number), number{val}, id(counter++) {}
         explicit Value(const bool val): tag(ValueType::Boolean), boolean{val}, id(counter++) {}
         explicit Value(std::string val): tag(ValueType::String), string{std::move(val)}, id(counter++) {}
@@ -113,7 +113,7 @@ namespace value {
             return tag;
         }
 
-        bool asInteger(long long & out) const {
+        bool asInteger(int64_t & out) const {
             if (tag == ValueType::Number) out = number;
             if (tag == ValueType::Boolean) out = boolean;
             if (tag == ValueType::Integer) out = integer;

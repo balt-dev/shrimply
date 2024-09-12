@@ -47,14 +47,14 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             frame.sourcePos = rhs->position;
             if ( left.getTag() == Value::ValueType::String ) {
                 auto str = left.asString();
-                long long right;
+                int64_t right;
                 auto r = rhs->result(frame);
                 if (!r.asInteger(right)) throw RuntimeError(frame, "cannot index string using " + r.raw_string());
                 if (right < 0 || right >= str.size()) throw RuntimeError(frame, "string index is out of bounds: " + std::to_string(right));
                 return Value(std::string(1, str.c_str()[right]));
             }
             if ( std::shared_ptr<std::vector<Value>> list {}; left.asList(list) ) {
-                long long right;
+                int64_t right;
                 auto r = rhs->result(frame);
                 if (!r.asInteger(right)) throw RuntimeError(frame, "cannot index list using " + r.raw_string());
                 if (right < 0 || right >= list->size()) throw RuntimeError(frame, "list index is out of bounds: " + std::to_string(right));
@@ -103,7 +103,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             frame.sourcePos = rhs->position;
             auto right = rhs->result(frame);
             if (
-                long long count;
+                int64_t count;
                 left.getTag() == Value::ValueType::String && right.asInteger(count)
             ) {
                 std::ostringstream ss;
@@ -167,7 +167,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             auto left = lhs->result(frame); \
             frame.sourcePos = rhs->position; \
             auto right = rhs->result(frame); \
-            long long x, y;  \
+            int64_t x, y;  \
             if (!(left.asInteger(x) && right.asInteger(y))) throw RuntimeError(frame, \
                 "cannot apply bitwise " name " to values " + \
                 left.raw_string() + " and " + right.raw_string()\
@@ -184,7 +184,7 @@ Value parsing::BinaryOp::result(Stackframe & frame) {
             auto right = rhs->result(frame);
             if (left.tag == Value::ValueType::Boolean && right.tag == Value::ValueType::Boolean)
                 return Value(left.boolean != right.boolean);
-            long long x, y;
+            int64_t x, y;
             if (left.asInteger(x) && right.asInteger(y))
                 return Value(left.integer ^ right.integer);
             throw RuntimeError(frame, "cannot apply binary xor to values " + left.raw_string() + " and " + right.raw_string() );
@@ -247,7 +247,7 @@ Value *parsing::BinaryOp::pointer(Stackframe &frame) {
             frame.sourcePos = rhs->position;
             auto left = lhs->result(frame);
             auto index = rhs->result(frame);
-            long long num;
+            int64_t num;
             if (!index.asInteger(num))
                 throw RuntimeError(frame, "cannot index list using " + index.raw_string());
             if (num < 0 || num >= list->size())
@@ -620,7 +620,7 @@ Value SyntaxFunction::call(Stackframe &frame, std::vector<Value> & args) {
     for (; iter != argumentNames.end(); ++iter) {
         variables[*iter] = Value();
     }
-    variables["__ARGC"] = Value((long long) args.size());
+    variables["__ARGC"] = Value((int64_t) args.size());
     auto childFrame = frame.branch(pos);
     childFrame.variables = variables;
     childFrame.functionName = name;

@@ -511,7 +511,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                     try {
                         auto string = token.span();
                         if (string.find('.') == std::string::npos) {
-                            long long number = std::stoll(string);
+                            int64_t number = std::stoll(string);
                             treeCursor.push_back(std::make_shared<Literal>(value::Value(number)));
                         } else {
                             double number = std::stod(string);
@@ -530,7 +530,7 @@ reinterpret: // Note: this is in place of TCO-powered recursion, since TCO isn't
                     stateStack.pop_back(); \
                     auto span = token.span().substr(2); \
                     try { \
-                        auto number = (long long) std::stoull(span, nullptr, base); \
+                        auto number = (int64_t) std::stoull(span, nullptr, base); \
                         treeCursor.push_back(std::make_shared<Literal>(value::Value(number))); \
                         treeCursor.back()->position = token.getPosition(); \
                         break; \

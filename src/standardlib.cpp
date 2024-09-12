@@ -22,10 +22,10 @@ std::string operator ""_str(const char* buf, size_t len) {
 struct Input final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(1);
-        auto target = args[0].raw_string();
-#define TRY_INPUT(name, type) if (target == #name) { type input; std::cin >> input >> std::ws; if (!std::cin) throw RuntimeError(frame, "could not parse user input as " #name); return Value(input); }
+        auto target = args[0].to_string();
+#define TRY_INPUT(name, type) if (target == #name) { type input = 0; std::cin >> input >> std::ws; if (true) { std::cin.clear(); std::cin.ignore(1 << 15, '\n'); throw RuntimeError(frame, "could not parse user input as " #name); } return Value(input); }
         TRY_INPUT(number, double);
-        TRY_INPUT(integer, long long);
+        TRY_INPUT(integer, int64_t);
         TRY_INPUT(boolean, bool);
         if (target == "string") {
             std::string input;
@@ -83,11 +83,11 @@ struct Length final: AbstractFunction {
         const auto& value = args[0];
         switch (value.tag) {
             case Value::ValueType::List:
-                return Value((long long) value.list->size());
+                return Value((int64_t) value.list->size());
             case Value::ValueType::String:
-                return Value((long long) value.string.size());
+                return Value((int64_t) value.string.size());
             case Value::ValueType::Map:
-                return Value((long long) value.map->size());
+                return Value((int64_t) value.map->size());
             default:
                 throw RuntimeError(frame, "cannot get length of value: " + value.raw_string());
         }
@@ -176,8 +176,8 @@ struct Substring final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> & args) override {
         EXPECT_ARGC(3);
         const std::string haystack = args[0].asString();
-        long long start; EXPECT_TYPE(start, args[1], asInteger, "integer");
-        long long end; EXPECT_TYPE(end, args[2], asInteger, "integer");
+        int64_t start; EXPECT_TYPE(start, args[1], asInteger, "integer");
+        int64_t end; EXPECT_TYPE(end, args[2], asInteger, "integer");
         if (start > end) throw RuntimeError(frame, "substring start cannot be greater than end");
         if (0 > start && start > haystack.size()) throw RuntimeError(frame, "substring start out of bounds");
         if (0 > end && end > haystack.size()) throw RuntimeError(frame, "substring end out of bounds");
@@ -190,9 +190,9 @@ struct Find final: AbstractFunction {
         EXPECT_ARGC(2);
         const std::string haystack = args[0].asString();
         const std::string needle = args[1].asString();
-        long long index = 0;
+        int64_t index = 0;
         if (args.size() >= 2) EXPECT_TYPE(index, args[2], asInteger, "integer");
-        return Value((long long) haystack.find(needle, index));
+        return Value((int64_t) haystack.find(needle, index));
     }
 };
 
@@ -291,7 +291,7 @@ struct Floor final: AbstractFunction {
 struct AsInteger final: AbstractFunction {
     Value call(Stackframe &frame, std::vector<Value> &args) override {
         EXPECT_ARGC(1);
-        long long value; EXPECT_TYPE(value, args[0], asInteger, "integer");
+        int64_t value; EXPECT_TYPE(value, args[0], asInteger, "integer");
         return Value ( value );
     }
 };
@@ -314,7 +314,7 @@ struct Rand final: AbstractFunction {
             if (args[0].tag == Value::ValueType::Null)
                 srand(time(nullptr) * getpid());
             else {
-                long long seed;
+                int64_t seed;
                 EXPECT_TYPE(seed, args[0], asInteger, "integer");
                 srand(seed);
             }
@@ -363,6 +363,7 @@ std::shared_ptr<runtime::Module> initStdlib() {
     std::shared_ptr<runtime::Module> std = std::make_shared<runtime::Module>(true);
     std->functions["print"] = std::make_shared<Print>();
     std->functions["println"] = std::make_shared<PrintLine>();
+    std->functions["input"] = std::make_shared<Input>();
     std->functions["typeof"] = std::make_shared<TypeOf>();
     std->functions["crash"] = std::make_shared<Crash>();
     std->functions["length"] = std::make_shared<Length>();
